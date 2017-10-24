@@ -87,7 +87,7 @@ var instTable = map[uint8]InstParams{
 	0x06: {"asl", zrp, exec_asl, 2, 5},
 	0x08: {"php", imp, exec_php, 1, 3},
 	0x09: {"ora", imm, exec_ora, 2, 2},
-	0x0A: {"asl", imp, exec_asl, 1, 2},
+	0x0A: {"asl", acc, exec_asl, 1, 2},
 	0x0D: {"ora", abs, exec_ora, 3, 4},
 	0x0E: {"asl", abs, exec_asl, 3, 6},
 	0x10: {"bpl", rel, exec_bpl, 2, 2},
@@ -467,9 +467,8 @@ func update_flags_nz(v uint8, cpu *Cpu) {
 func exec_bmi(cpu *Cpu, mode InstMode, bytes uint) {
 	if cpu.p&P_N != 0 {
 		cpu.pc += uint16(get_value_imm(cpu))
-	} else {
-		cpu.pc += uint16(bytes)
 	}
+	cpu.pc += uint16(bytes)
 }
 
 func exec_lda(cpu *Cpu, mode InstMode, bytes uint) {
@@ -893,7 +892,10 @@ func (cpu *Cpu) setNmi() {
 
 func (cpu *Cpu) executeInst() uint {
 	if cpu.nmiLatched {
-		cpu.push16(cpu.pc)
+		Debug("NMI latched\n")
+		cpu.nmiLatched = false
+		cpu.push16(cpu.pc - 1)
+		cpu.push8(cpu.p)
 		cpu.pc = cpu.mem.Read16(VEC_NMI)
 	}
 
@@ -901,10 +903,9 @@ func (cpu *Cpu) executeInst() uint {
 	opc := cpu.mem.Read8(cpu.pc)
 	mode := instTable[opc].mode
 	bytes := instTable[opc].bytes
+	Debug("%08X: %s %-10s    opc=%02Xh\n", pc, instTable[opc].mnemonic, modeOpsTable[mode].getOpdString(cpu, pc), opc)
 	instTable[opc].handler(cpu, mode, bytes)
 	cycle := instTable[opc].cycle
-
-	Debug("%08X: %s %-10s    opc=%02Xh cycle=%d\n", pc, instTable[opc].mnemonic, modeOpsTable[mode].getOpdString(cpu, pc), opc, cycle)
 
 	return cycle
 }

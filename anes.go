@@ -3,10 +3,11 @@ package main
 import "./nespkg"
 
 import (
+	"flag"
+	"fmt"
 	"image"
 	"image/color"
 	"log"
-	"os"
 )
 
 import (
@@ -178,11 +179,15 @@ func runMyWidget(display *NesDisplay, nes *nespkg.Nes) {
 }
 
 func main() {
+	flag.BoolVar(&nespkg.DebugEnable, "debug", false, "Enable debug mode")
+	flag.Parse()
+	fmt.Println("debug: ", nespkg.DebugEnable)
+
 	display := NewNesDisplay()
 	nes := nespkg.NewNes(display)
-	if len(os.Args) >= 2 {
-		nespkg.Debug("loading: %s\n", os.Args[1])
-		nes.LoadRom(os.Args[1])
+	if len(flag.Args()) >= 1 {
+		nespkg.Debug("loading: %s\n", flag.Arg(0))
+		nes.LoadRom(flag.Arg(0))
 	} else {
 		nespkg.Debug("invalid argument\n")
 		return

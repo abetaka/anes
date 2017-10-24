@@ -11,17 +11,11 @@ const vramPageShift = 8
 const vramPageSize = 1 << vramPageShift
 const vramPages = vramSize / vramPageSize
 
-type Palette struct {
-	bgPalette     [4][]uint8
-	spritePalette [4][]uint8
-}
-
 type Ppu struct {
 	ppuctrl         uint8
 	ppumask         uint8
 	ppustatus       uint8
 	oamaddr         uint8
-	oamdata         uint8
 	oamdma          uint8
 	ppuscrollx      uint8
 	ppuscrolly      uint8
@@ -36,7 +30,6 @@ type Ppu struct {
 	nametable       [4][]uint8
 	attributetable  [4][]uint8
 	oam             [4 * 64]uint8
-	palette         Palette
 	bgPalette       [4][]uint8
 	spritePalette   [4][]uint8
 	screen          [ScreenSizePixY][ScreenSizePixX]uint8
@@ -219,7 +212,7 @@ func (ppu *Ppu) readOamdata() uint8 {
 
 func (ppu *Ppu) writeOamdma(hi uint8) {
 	const oamdmalen = 0x100
-	cpuaddr := uint16(hi << 8)
+	cpuaddr := uint16(hi) << 8
 	for i := 0; i < oamdmalen; i++ {
 		ppu.oam[int(hi)+i] = ppu.nes.mem.Read8(cpuaddr)
 		cpuaddr++
@@ -265,7 +258,7 @@ func (ppu *Ppu) renderPixel(col uint, row uint) {
 	const tileSize = 8
 	const hiOffset = 8
 
-	x := col + uint(ppu.ppuscrolly)
+	x := col + uint(ppu.ppuscrollx)
 	y := row + uint(ppu.ppuscrolly)
 	nametableIndex := getNametableIndex(x, y)
 	nametable := ppu.nametable[nametableIndex]
@@ -280,7 +273,7 @@ func (ppu *Ppu) renderPixel(col uint, row uint) {
 	attributetable := ppu.attributetable[nametableIndex]
 	paletteIndex := getPaletteIndex(attributetable, x, y)
 
-	pix := bits(uint(lo), x%tileSize, 1) | (bits(uint(hi), x%tileSize, 1) << 1)
+	pix := bits(uint(lo), tileSize-1-x%tileSize, 1) | (bits(uint(hi), tileSize-1-x%tileSize, 1) << 1)
 	if pix == 0 {
 		ppu.screen[row][col] = ppu.bgPalette[0][0]
 	} else {
@@ -323,6 +316,7 @@ const firstVisibleScanline = 0
 const lastVisibleScanline = 239
 const firstVBlankScanline = 241
 const lastScanline = 261
+const numScanlines = 262
 
 func scanlineToClock(row uint) uint {
 	return (row + 1) * 341
@@ -336,14 +330,17 @@ func (ppu *Ppu) giveCpuClockDelta(cpuclockDelta uint) {
 		} else if row == firstVBlankScanline && ppu.vblankNmi() {
 			ppu.nes.cpu.setNmi()
 		}
-		ppu.currentScanline = row
 
 		if row == lastVisibleScanline {
 			Debug("lastVisibleScanline\n")
 			ppu.nes.display.Render(&ppu.screen)
-		} else if row == lastScanline {
+		}
+
+		if row == lastScanline {
 			ppu.currentScanline = 0
 			ppu.clock = 0
+		} else {
+			ppu.currentScanline++
 		}
 	}
 }
