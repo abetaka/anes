@@ -179,7 +179,7 @@ func runMyWidget(display *NesDisplay, nes *nespkg.Nes) {
 }
 
 func main() {
-	flag.BoolVar(&nespkg.DebugEnable, "debug", false, "Enable debug mode")
+	flag.BoolVar(&nespkg.DebugEnable, "d", false, "Enable debug mode")
 	flag.Parse()
 	fmt.Println("debug: ", nespkg.DebugEnable)
 

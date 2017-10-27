@@ -11,6 +11,12 @@ const vramPageShift = 8
 const vramPageSize = 1 << vramPageShift
 const vramPages = vramSize / vramPageSize
 
+type Ppustatus struct {
+	data uint8
+}
+
+const PPUSTATUS_V = uint8(0x80)
+
 type Ppu struct {
 	ppuctrl         uint8
 	ppumask         uint8
@@ -143,7 +149,9 @@ func (ppu *Ppu) emphasizeBlue() uint {
 }
 
 func (ppu *Ppu) readPpustatus() uint8 {
-	return ppu.ppustatus
+	v := ppu.ppustatus
+	ppu.ppustatus &= ^PPUSTATUS_V
+	return v
 }
 
 func (ppu *Ppu) writePpuscroll(v uint8) {
@@ -211,10 +219,9 @@ func (ppu *Ppu) readOamdata() uint8 {
 }
 
 func (ppu *Ppu) writeOamdma(hi uint8) {
-	const oamdmalen = 0x100
 	cpuaddr := uint16(hi) << 8
-	for i := 0; i < oamdmalen; i++ {
-		ppu.oam[int(hi)+i] = ppu.nes.mem.Read8(cpuaddr)
+	for i := 0; i < 0x100; i++ {
+		ppu.oam[i] = ppu.nes.mem.Read8(cpuaddr)
 		cpuaddr++
 	}
 }
@@ -303,7 +310,7 @@ func (ppu *Ppu) vramRead8(address uint16) uint8 {
 }
 
 func (ppu *Ppu) reset() {
-	ppu.currentScanline = 0
+	ppu.currentScanline = preRenderScanline
 	ppu.clock = 0
 }
 
@@ -315,7 +322,7 @@ func toPpuClockDelta(cpuclockDelta uint) uint {
 const firstVisibleScanline = 0
 const lastVisibleScanline = 239
 const firstVBlankScanline = 241
-const lastScanline = 261
+const preRenderScanline = 261
 const numScanlines = 262
 
 func scanlineToClock(row uint) uint {
@@ -327,8 +334,12 @@ func (ppu *Ppu) giveCpuClockDelta(cpuclockDelta uint) {
 	for row := ppu.currentScanline; ppu.clock >= scanlineToClock(row); row++ {
 		if row >= firstVisibleScanline && row <= lastVisibleScanline {
 			ppu.renderScanline(row)
-		} else if row == firstVBlankScanline && ppu.vblankNmi() {
-			ppu.nes.cpu.setNmi()
+		} else if row == firstVBlankScanline {
+			Debug("firstVBlankScanline\n")
+			ppu.ppustatus |= PPUSTATUS_V
+			if ppu.vblankNmi() {
+				ppu.nes.cpu.setNmi()
+			}
 		}
 
 		if row == lastVisibleScanline {
@@ -336,7 +347,8 @@ func (ppu *Ppu) giveCpuClockDelta(cpuclockDelta uint) {
 			ppu.nes.display.Render(&ppu.screen)
 		}
 
-		if row == lastScanline {
+		if row == preRenderScanline {
+			ppu.ppustatus &= ^PPUSTATUS_V
 			ppu.currentScanline = 0
 			ppu.clock = 0
 		} else {

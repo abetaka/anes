@@ -29,12 +29,9 @@ const VEC_IRQ = 0xfffe
 const NES_SIZE_H = 256
 const NES_SIZE_V = 240
 
-type InstHandler func(cpu *Cpu, mode InstMode, bytes uint)
-
 type InstParams struct {
 	mnemonic string
 	mode     InstMode
-	handler  InstHandler
 	bytes    uint
 	cycle    uint
 }
@@ -81,157 +78,313 @@ var modeOpsTable = map[InstMode]ModeOps{
 }
 
 var instTable = map[uint8]InstParams{
-	0x00: {"brk", imp, exec_brk, 1, 7},
-	0x01: {"ora", inx, exec_ora, 2, 6},
-	0x05: {"ora", zrp, exec_ora, 2, 3},
-	0x06: {"asl", zrp, exec_asl, 2, 5},
-	0x08: {"php", imp, exec_php, 1, 3},
-	0x09: {"ora", imm, exec_ora, 2, 2},
-	0x0A: {"asl", acc, exec_asl, 1, 2},
-	0x0D: {"ora", abs, exec_ora, 3, 4},
-	0x0E: {"asl", abs, exec_asl, 3, 6},
-	0x10: {"bpl", rel, exec_bpl, 2, 2},
-	0x11: {"ora", iny, exec_ora, 2, 5},
-	0x15: {"ora", zpx, exec_ora, 2, 4},
-	0x16: {"asl", zpx, exec_asl, 2, 6},
-	0x18: {"clc", imp, exec_clc, 1, 2},
-	0x19: {"ora", aby, exec_ora, 3, 4},
-	0x1D: {"ora", abx, exec_ora, 3, 4},
-	0x1E: {"asl", abx, exec_asl, 3, 7},
-	0x20: {"jsr", abs, exec_jsr, 3, 6},
-	0x21: {"and", inx, exec_and, 2, 6},
-	0x24: {"bit", zrp, exec_bit, 2, 3},
-	0x25: {"and", zrp, exec_and, 2, 3},
-	0x26: {"rol", zrp, exec_rol, 2, 5},
-	0x28: {"plp", imp, exec_plp, 1, 4},
-	0x29: {"and", imm, exec_and, 2, 2},
-	0x2A: {"rol", acc, exec_rol, 1, 2},
-	0x2C: {"bit", abs, exec_bit, 3, 4},
-	0x2D: {"and", abs, exec_and, 3, 4},
-	0x2E: {"rol", abs, exec_rol, 3, 6},
-	0x30: {"bmi", rel, exec_bmi, 2, 2},
-	0x31: {"and", iny, exec_and, 2, 5},
-	0x35: {"and", zpx, exec_and, 2, 4},
-	0x36: {"rol", zpx, exec_rol, 2, 6},
-	0x38: {"sec", imp, exec_sec, 1, 2},
-	0x39: {"and", aby, exec_and, 3, 4},
-	0x3D: {"and", abx, exec_and, 3, 4},
-	0x3E: {"rol", abx, exec_rol, 3, 7},
-	0x40: {"rti", imp, exec_rti, 1, 6},
-	0x41: {"eor", inx, exec_eor, 2, 6},
-	0x45: {"eor", zrp, exec_eor, 2, 3},
-	0x46: {"lsr", zrp, exec_lsr, 2, 5},
-	0x48: {"pha", imp, exec_pha, 1, 3},
-	0x49: {"eor", imm, exec_eor, 2, 2},
-	0x4A: {"lsr", acc, exec_lsr, 1, 2},
-	0x4C: {"jmp", abs, exec_jmp, 3, 3},
-	0x4D: {"eor", abs, exec_eor, 3, 4},
-	0x4E: {"lsr", abs, exec_lsr, 3, 6},
-	0x50: {"bvc", rel, exec_bvc, 2, 2},
-	0x51: {"eor", iny, exec_eor, 2, 5},
-	0x55: {"eor", zpx, exec_eor, 2, 4},
-	0x56: {"lsr", zpx, exec_lsr, 2, 6},
-	0x58: {"cli", imp, exec_cli, 1, 2},
-	0x59: {"eor", aby, exec_eor, 3, 4},
-	0x5D: {"eor", abx, exec_eor, 3, 4},
-	0x5E: {"lsr", abx, exec_lsr, 3, 7},
-	0x60: {"rts", imp, exec_rts, 1, 6},
-	0x61: {"adc", inx, exec_adc, 2, 6},
-	0x65: {"adc", zrp, exec_adc, 2, 3},
-	0x66: {"ror", zrp, exec_ror, 2, 5},
-	0x68: {"pla", imp, exec_pla, 1, 4},
-	0x69: {"adc", imm, exec_adc, 2, 2},
-	0x6A: {"ror", acc, exec_ror, 1, 2},
-	0x6C: {"jmp", ind, exec_jmp, 3, 5},
-	0x6D: {"adc", abs, exec_adc, 3, 4},
-	0x6E: {"ror", abs, exec_ror, 3, 6},
-	0x70: {"bvs", rel, exec_bvs, 2, 2},
-	0x71: {"adc", iny, exec_adc, 2, 5},
-	0x75: {"adc", zpx, exec_adc, 2, 4},
-	0x76: {"ror", zpx, exec_ror, 2, 6},
-	0x78: {"sei", imp, exec_sei, 1, 2},
-	0x79: {"adc", aby, exec_adc, 3, 4},
-	0x7D: {"adc", abx, exec_adc, 3, 4},
-	0x7E: {"ror", abx, exec_ror, 3, 7},
-	0x81: {"sta", inx, exec_sta, 2, 6},
-	0x84: {"sty", zrp, exec_sty, 2, 3},
-	0x85: {"sta", zrp, exec_sta, 2, 3},
-	0x86: {"stx", zrp, exec_stx, 2, 3},
-	0x88: {"dey", imp, exec_dey, 1, 2},
-	0x8A: {"txa", imp, exec_txa, 1, 2},
-	0x8C: {"sty", abs, exec_sty, 3, 4},
-	0x8D: {"sta", abs, exec_sta, 3, 4},
-	0x8E: {"stx", abs, exec_stx, 3, 4},
-	0x90: {"bcc", rel, exec_bcc, 2, 2},
-	0x91: {"sta", iny, exec_sta, 2, 6},
-	0x94: {"sty", zpx, exec_sty, 2, 4},
-	0x95: {"sta", zpx, exec_sta, 2, 4},
-	0x96: {"stx", zpy, exec_stx, 2, 4},
-	0x98: {"tya", imp, exec_tya, 1, 2},
-	0x99: {"sta", aby, exec_sta, 3, 5},
-	0x9A: {"txs", imp, exec_txs, 1, 2},
-	0x9D: {"sta", abx, exec_sta, 3, 5},
-	0xA0: {"ldy", imm, exec_ldy, 2, 2},
-	0xA1: {"lda", inx, exec_lda, 2, 6},
-	0xA2: {"ldx", imm, exec_ldx, 2, 2},
-	0xA4: {"ldy", zrp, exec_ldy, 2, 3},
-	0xA5: {"lda", zrp, exec_lda, 2, 3},
-	0xA6: {"ldx", zrp, exec_ldx, 2, 3},
-	0xA8: {"tay", imp, exec_tay, 1, 2},
-	0xA9: {"lda", imm, exec_lda, 2, 2},
-	0xAA: {"tax", imp, exec_tax, 1, 2},
-	0xAC: {"ldy", abs, exec_ldy, 3, 4},
-	0xAD: {"lda", abs, exec_lda, 3, 4},
-	0xAE: {"ldx", abs, exec_ldx, 3, 4},
-	0xB0: {"bcs", rel, exec_bcs, 2, 2},
-	0xB1: {"lda", iny, exec_lda, 2, 5},
-	0xB4: {"ldy", zpx, exec_ldy, 2, 4},
-	0xB5: {"lda", zpx, exec_lda, 2, 4},
-	0xB6: {"ldx", zpy, exec_ldx, 2, 4},
-	0xB8: {"clv", imp, exec_clv, 1, 2},
-	0xB9: {"lda", aby, exec_lda, 3, 4},
-	0xBA: {"tsx", imp, exec_tsx, 1, 2},
-	0xBC: {"ldy", abx, exec_ldy, 3, 4},
-	0xBD: {"lda", abx, exec_lda, 3, 4},
-	0xBE: {"ldx", aby, exec_ldx, 3, 4},
-	0xC0: {"cpy", imm, exec_cpy, 2, 2},
-	0xC1: {"cmp", inx, exec_cmp, 2, 6},
-	0xC4: {"cpy", zrp, exec_cpy, 2, 3},
-	0xC5: {"cmp", zrp, exec_cmp, 2, 3},
-	0xC6: {"dec", zrp, exec_dec, 2, 5},
-	0xC8: {"iny", imp, exec_iny, 1, 2},
-	0xC9: {"cmp", imm, exec_cmp, 2, 2},
-	0xCA: {"dex", imp, exec_dex, 1, 2},
-	0xCC: {"cpy", abs, exec_cpy, 3, 4},
-	0xCD: {"cmp", abs, exec_cmp, 3, 4},
-	0xCE: {"dec", abs, exec_dec, 3, 6},
-	0xD0: {"bne", rel, exec_bne, 2, 2},
-	0xD1: {"cmp", iny, exec_cmp, 2, 5},
-	0xD5: {"cmp", zpx, exec_cmp, 2, 4},
-	0xD6: {"dec", zpx, exec_dec, 2, 6},
-	0xD8: {"cld", imp, exec_cld, 1, 2},
-	0xD9: {"cmp", aby, exec_cmp, 3, 4},
-	0xDD: {"cmp", abx, exec_cmp, 3, 4},
-	0xDE: {"dec", abx, exec_dec, 3, 7},
-	0xE0: {"cpx", imm, exec_cpx, 2, 2},
-	0xE1: {"sbc", inx, exec_sbc, 2, 6},
-	0xE4: {"cpx", zrp, exec_cpx, 2, 3},
-	0xE5: {"sbc", zrp, exec_sbc, 2, 3},
-	0xE6: {"inc", zrp, exec_inc, 2, 5},
-	0xE8: {"inx", imp, exec_inx, 1, 2},
-	0xE9: {"sbc", imm, exec_sbc, 2, 2},
-	0xEA: {"nop", imp, exec_nop, 1, 2},
-	0xEC: {"cpx", abs, exec_cpx, 3, 4},
-	0xED: {"sbc", abs, exec_sbc, 3, 4},
-	0xEE: {"inc", abs, exec_inc, 3, 6},
-	0xF0: {"beq", rel, exec_beq, 2, 2},
-	0xF1: {"sbc", iny, exec_sbc, 2, 5},
-	0xF5: {"sbc", zpx, exec_sbc, 2, 4},
-	0xF6: {"inc", zpx, exec_inc, 2, 6},
-	0xF8: {"sed", imp, exec_sed, 1, 2},
-	0xF9: {"sbc", aby, exec_sbc, 3, 4},
-	0xFD: {"sbc", abx, exec_sbc, 3, 4},
-	0xFE: {"inc", abx, exec_inc, 3, 7},
+	0x00: {"brk", imp, 1, 7},
+	0x01: {"ora", inx, 2, 6},
+	0x05: {"ora", zrp, 2, 3},
+	0x06: {"asl", zrp, 2, 5},
+	0x08: {"php", imp, 1, 3},
+	0x09: {"ora", imm, 2, 2},
+	0x0A: {"asl", acc, 1, 2},
+	0x0D: {"ora", abs, 3, 4},
+	0x0E: {"asl", abs, 3, 6},
+	0x10: {"bpl", rel, 2, 2},
+	0x11: {"ora", iny, 2, 5},
+	0x15: {"ora", zpx, 2, 4},
+	0x16: {"asl", zpx, 2, 6},
+	0x18: {"clc", imp, 1, 2},
+	0x19: {"ora", aby, 3, 4},
+	0x1D: {"ora", abx, 3, 4},
+	0x1E: {"asl", abx, 3, 7},
+	0x20: {"jsr", abs, 3, 6},
+	0x21: {"and", inx, 2, 6},
+	0x24: {"bit", zrp, 2, 3},
+	0x25: {"and", zrp, 2, 3},
+	0x26: {"rol", zrp, 2, 5},
+	0x28: {"plp", imp, 1, 4},
+	0x29: {"and", imm, 2, 2},
+	0x2A: {"rol", acc, 1, 2},
+	0x2C: {"bit", abs, 3, 4},
+	0x2D: {"and", abs, 3, 4},
+	0x2E: {"rol", abs, 3, 6},
+	0x30: {"bmi", rel, 2, 2},
+	0x31: {"and", iny, 2, 5},
+	0x35: {"and", zpx, 2, 4},
+	0x36: {"rol", zpx, 2, 6},
+	0x38: {"sec", imp, 1, 2},
+	0x39: {"and", aby, 3, 4},
+	0x3D: {"and", abx, 3, 4},
+	0x3E: {"rol", abx, 3, 7},
+	0x40: {"rti", imp, 1, 6},
+	0x41: {"eor", inx, 2, 6},
+	0x45: {"eor", zrp, 2, 3},
+	0x46: {"lsr", zrp, 2, 5},
+	0x48: {"pha", imp, 1, 3},
+	0x49: {"eor", imm, 2, 2},
+	0x4A: {"lsr", acc, 1, 2},
+	0x4C: {"jmp", abs, 3, 3},
+	0x4D: {"eor", abs, 3, 4},
+	0x4E: {"lsr", abs, 3, 6},
+	0x50: {"bvc", rel, 2, 2},
+	0x51: {"eor", iny, 2, 5},
+	0x55: {"eor", zpx, 2, 4},
+	0x56: {"lsr", zpx, 2, 6},
+	0x58: {"cli", imp, 1, 2},
+	0x59: {"eor", aby, 3, 4},
+	0x5D: {"eor", abx, 3, 4},
+	0x5E: {"lsr", abx, 3, 7},
+	0x60: {"rts", imp, 1, 6},
+	0x61: {"adc", inx, 2, 6},
+	0x65: {"adc", zrp, 2, 3},
+	0x66: {"ror", zrp, 2, 5},
+	0x68: {"pla", imp, 1, 4},
+	0x69: {"adc", imm, 2, 2},
+	0x6A: {"ror", acc, 1, 2},
+	0x6C: {"jmp", ind, 3, 5},
+	0x6D: {"adc", abs, 3, 4},
+	0x6E: {"ror", abs, 3, 6},
+	0x70: {"bvs", rel, 2, 2},
+	0x71: {"adc", iny, 2, 5},
+	0x75: {"adc", zpx, 2, 4},
+	0x76: {"ror", zpx, 2, 6},
+	0x78: {"sei", imp, 1, 2},
+	0x79: {"adc", aby, 3, 4},
+	0x7D: {"adc", abx, 3, 4},
+	0x7E: {"ror", abx, 3, 7},
+	0x81: {"sta", inx, 2, 6},
+	0x84: {"sty", zrp, 2, 3},
+	0x85: {"sta", zrp, 2, 3},
+	0x86: {"stx", zrp, 2, 3},
+	0x88: {"dey", imp, 1, 2},
+	0x8A: {"txa", imp, 1, 2},
+	0x8C: {"sty", abs, 3, 4},
+	0x8D: {"sta", abs, 3, 4},
+	0x8E: {"stx", abs, 3, 4},
+	0x90: {"bcc", rel, 2, 2},
+	0x91: {"sta", iny, 2, 6},
+	0x94: {"sty", zpx, 2, 4},
+	0x95: {"sta", zpx, 2, 4},
+	0x96: {"stx", zpy, 2, 4},
+	0x98: {"tya", imp, 1, 2},
+	0x99: {"sta", aby, 3, 5},
+	0x9A: {"txs", imp, 1, 2},
+	0x9D: {"sta", abx, 3, 5},
+	0xA0: {"ldy", imm, 2, 2},
+	0xA1: {"lda", inx, 2, 6},
+	0xA2: {"ldx", imm, 2, 2},
+	0xA4: {"ldy", zrp, 2, 3},
+	0xA5: {"lda", zrp, 2, 3},
+	0xA6: {"ldx", zrp, 2, 3},
+	0xA8: {"tay", imp, 1, 2},
+	0xA9: {"lda", imm, 2, 2},
+	0xAA: {"tax", imp, 1, 2},
+	0xAC: {"ldy", abs, 3, 4},
+	0xAD: {"lda", abs, 3, 4},
+	0xAE: {"ldx", abs, 3, 4},
+	0xB0: {"bcs", rel, 2, 2},
+	0xB1: {"lda", iny, 2, 5},
+	0xB4: {"ldy", zpx, 2, 4},
+	0xB5: {"lda", zpx, 2, 4},
+	0xB6: {"ldx", zpy, 2, 4},
+	0xB8: {"clv", imp, 1, 2},
+	0xB9: {"lda", aby, 3, 4},
+	0xBA: {"tsx", imp, 1, 2},
+	0xBC: {"ldy", abx, 3, 4},
+	0xBD: {"lda", abx, 3, 4},
+	0xBE: {"ldx", aby, 3, 4},
+	0xC0: {"cpy", imm, 2, 2},
+	0xC1: {"cmp", inx, 2, 6},
+	0xC4: {"cpy", zrp, 2, 3},
+	0xC5: {"cmp", zrp, 2, 3},
+	0xC6: {"dec", zrp, 2, 5},
+	0xC8: {"iny", imp, 1, 2},
+	0xC9: {"cmp", imm, 2, 2},
+	0xCA: {"dex", imp, 1, 2},
+	0xCC: {"cpy", abs, 3, 4},
+	0xCD: {"cmp", abs, 3, 4},
+	0xCE: {"dec", abs, 3, 6},
+	0xD0: {"bne", rel, 2, 2},
+	0xD1: {"cmp", iny, 2, 5},
+	0xD5: {"cmp", zpx, 2, 4},
+	0xD6: {"dec", zpx, 2, 6},
+	0xD8: {"cld", imp, 1, 2},
+	0xD9: {"cmp", aby, 3, 4},
+	0xDD: {"cmp", abx, 3, 4},
+	0xDE: {"dec", abx, 3, 7},
+	0xE0: {"cpx", imm, 2, 2},
+	0xE1: {"sbc", inx, 2, 6},
+	0xE4: {"cpx", zrp, 2, 3},
+	0xE5: {"sbc", zrp, 2, 3},
+	0xE6: {"inc", zrp, 2, 5},
+	0xE8: {"inx", imp, 1, 2},
+	0xE9: {"sbc", imm, 2, 2},
+	0xEA: {"nop", imp, 1, 2},
+	0xEC: {"cpx", abs, 3, 4},
+	0xED: {"sbc", abs, 3, 4},
+	0xEE: {"inc", abs, 3, 6},
+	0xF0: {"beq", rel, 2, 2},
+	0xF1: {"sbc", iny, 2, 5},
+	0xF5: {"sbc", zpx, 2, 4},
+	0xF6: {"inc", zpx, 2, 6},
+	0xF8: {"sed", imp, 1, 2},
+	0xF9: {"sbc", aby, 3, 4},
+	0xFD: {"sbc", abx, 3, 4},
+	0xFE: {"inc", abx, 3, 7},
+}
+
+type InstHandler func(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint
+
+var instHandlerTable = map[uint8]InstHandler{
+	0x00: exec_brk,
+	0x01: exec_ora,
+	0x05: exec_ora,
+	0x06: exec_asl,
+	0x08: exec_php,
+	0x09: exec_ora,
+	0x0A: exec_asl,
+	0x0D: exec_ora,
+	0x0E: exec_asl,
+	0x10: exec_bpl,
+	0x11: exec_ora,
+	0x15: exec_ora,
+	0x16: exec_asl,
+	0x18: exec_clc,
+	0x19: exec_ora,
+	0x1D: exec_ora,
+	0x1E: exec_asl,
+	0x20: exec_jsr,
+	0x21: exec_and,
+	0x24: exec_bit,
+	0x25: exec_and,
+	0x26: exec_rol,
+	0x28: exec_plp,
+	0x29: exec_and,
+	0x2A: exec_rol,
+	0x2C: exec_bit,
+	0x2D: exec_and,
+	0x2E: exec_rol,
+	0x30: exec_bmi,
+	0x31: exec_and,
+	0x35: exec_and,
+	0x36: exec_rol,
+	0x38: exec_sec,
+	0x39: exec_and,
+	0x3D: exec_and,
+	0x3E: exec_rol,
+	0x40: exec_rti,
+	0x41: exec_eor,
+	0x45: exec_eor,
+	0x46: exec_lsr,
+	0x48: exec_pha,
+	0x49: exec_eor,
+	0x4A: exec_lsr,
+	0x4C: exec_jmp,
+	0x4D: exec_eor,
+	0x4E: exec_lsr,
+	0x50: exec_bvc,
+	0x51: exec_eor,
+	0x55: exec_eor,
+	0x56: exec_lsr,
+	0x58: exec_cli,
+	0x59: exec_eor,
+	0x5D: exec_eor,
+	0x5E: exec_lsr,
+	0x60: exec_rts,
+	0x61: exec_adc,
+	0x65: exec_adc,
+	0x66: exec_ror,
+	0x68: exec_pla,
+	0x69: exec_adc,
+	0x6A: exec_ror,
+	0x6C: exec_jmp,
+	0x6D: exec_adc,
+	0x6E: exec_ror,
+	0x70: exec_bvs,
+	0x71: exec_adc,
+	0x75: exec_adc,
+	0x76: exec_ror,
+	0x78: exec_sei,
+	0x79: exec_adc,
+	0x7D: exec_adc,
+	0x7E: exec_ror,
+	0x81: exec_sta,
+	0x84: exec_sty,
+	0x85: exec_sta,
+	0x86: exec_stx,
+	0x88: exec_dey,
+	0x8A: exec_txa,
+	0x8C: exec_sty,
+	0x8D: exec_sta,
+	0x8E: exec_stx,
+	0x90: exec_bcc,
+	0x91: exec_sta,
+	0x94: exec_sty,
+	0x95: exec_sta,
+	0x96: exec_stx,
+	0x98: exec_tya,
+	0x99: exec_sta,
+	0x9A: exec_txs,
+	0x9D: exec_sta,
+	0xA0: exec_ldy,
+	0xA1: exec_lda,
+	0xA2: exec_ldx,
+	0xA4: exec_ldy,
+	0xA5: exec_lda,
+	0xA6: exec_ldx,
+	0xA8: exec_tay,
+	0xA9: exec_lda,
+	0xAA: exec_tax,
+	0xAC: exec_ldy,
+	0xAD: exec_lda,
+	0xAE: exec_ldx,
+	0xB0: exec_bcs,
+	0xB1: exec_lda,
+	0xB4: exec_ldy,
+	0xB5: exec_lda,
+	0xB6: exec_ldx,
+	0xB8: exec_clv,
+	0xB9: exec_lda,
+	0xBA: exec_tsx,
+	0xBC: exec_ldy,
+	0xBD: exec_lda,
+	0xBE: exec_ldx,
+	0xC0: exec_cpy,
+	0xC1: exec_cmp,
+	0xC4: exec_cpy,
+	0xC5: exec_cmp,
+	0xC6: exec_dec,
+	0xC8: exec_iny,
+	0xC9: exec_cmp,
+	0xCA: exec_dex,
+	0xCC: exec_cpy,
+	0xCD: exec_cmp,
+	0xCE: exec_dec,
+	0xD0: exec_bne,
+	0xD1: exec_cmp,
+	0xD5: exec_cmp,
+	0xD6: exec_dec,
+	0xD8: exec_cld,
+	0xD9: exec_cmp,
+	0xDD: exec_cmp,
+	0xDE: exec_dec,
+	0xE0: exec_cpx,
+	0xE1: exec_sbc,
+	0xE4: exec_cpx,
+	0xE5: exec_sbc,
+	0xE6: exec_inc,
+	0xE8: exec_inx,
+	0xE9: exec_sbc,
+	0xEA: exec_nop,
+	0xEC: exec_cpx,
+	0xED: exec_sbc,
+	0xEE: exec_inc,
+	0xF0: exec_beq,
+	0xF1: exec_sbc,
+	0xF5: exec_sbc,
+	0xF6: exec_inc,
+	0xF8: exec_sed,
+	0xF9: exec_sbc,
+	0xFD: exec_sbc,
+	0xFE: exec_inc,
 }
 
 type Cpu struct {
@@ -464,86 +617,92 @@ func update_flags_nz(v uint8, cpu *Cpu) {
 	}
 }
 
-func exec_bmi(cpu *Cpu, mode InstMode, bytes uint) {
-	if cpu.p&P_N != 0 {
-		cpu.pc += uint16(get_value_imm(cpu))
-	}
-	cpu.pc += uint16(bytes)
-}
-
-func exec_lda(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_lda(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.a = modeOpsTable[mode].getValue(cpu)
 	update_flags_nz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_ldx(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_ldx(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.x = modeOpsTable[mode].getValue(cpu)
 	update_flags_nz(cpu.x, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_ldy(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_ldy(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.y = modeOpsTable[mode].getValue(cpu)
 	update_flags_nz(cpu.y, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_jmp(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_jmp(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.pc = modeOpsTable[mode].getAddress(cpu)
+	return instTable[opc].cycle
 }
 
-func exec_sta(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_sta(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	modeOpsTable[mode].setValue(cpu, cpu.a)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_stx(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_stx(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	modeOpsTable[mode].setValue(cpu, cpu.x)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_sty(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_sty(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	modeOpsTable[mode].setValue(cpu, cpu.y)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_tax(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_tax(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.x = cpu.a
 	update_flags_nz(cpu.x, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_txa(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_txa(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.a = cpu.x
 	update_flags_nz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_txs(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_txs(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.s = cpu.x
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_tsx(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_tsx(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.x = cpu.s
 	update_flags_nz(cpu.x, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_tya(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_tya(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.a = cpu.y
 	update_flags_nz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_tay(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_tay(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.y = cpu.a
 	update_flags_nz(cpu.y, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_adc(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_adc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	a_prev := cpu.a
 	c := uint16(0)
 	if cpu.p&P_C != 0 {
@@ -562,16 +721,18 @@ func exec_adc(cpu *Cpu, mode InstMode, bytes uint) {
 	}
 	update_flags_nz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_and(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_and(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	v := modeOpsTable[mode].getValue(cpu)
 	cpu.a &= v
 	update_flags_nz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_asl(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_asl(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	v := modeOpsTable[mode].getValue(cpu)
 	if (v & 0x80) != 0 {
 		cpu.p |= P_C
@@ -582,9 +743,10 @@ func exec_asl(cpu *Cpu, mode InstMode, bytes uint) {
 	modeOpsTable[mode].setValue(cpu, v)
 	update_flags_nz(v, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_bit(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_bit(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p &= ^(P_V | P_N | P_Z)
 	v := modeOpsTable[mode].getValue(cpu)
 	if v&0x40 != 0 {
@@ -597,6 +759,7 @@ func exec_bit(cpu *Cpu, mode InstMode, bytes uint) {
 		cpu.p |= P_Z
 	}
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
 func cmp_gen(u uint8, v uint8, cpu *Cpu) {
@@ -612,79 +775,91 @@ func cmp_gen(u uint8, v uint8, cpu *Cpu) {
 	}
 }
 
-func exec_cmp(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_cmp(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	v := modeOpsTable[mode].getValue(cpu)
 	cmp_gen(cpu.a, v, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_cld(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_cld(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p &= ^P_D
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_sed(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_sed(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p |= P_D
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_cpx(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_cpx(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	v := modeOpsTable[mode].getValue(cpu)
 	cmp_gen(cpu.x, v, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_cpy(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_cpy(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	v := modeOpsTable[mode].getValue(cpu)
 	cmp_gen(cpu.y, v, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_dec(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_dec(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	v := modeOpsTable[mode].getValue(cpu) - 1
 	modeOpsTable[mode].setValue(cpu, v)
 	update_flags_nz(v, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_dex(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_dex(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.x--
-	update_flags_nz(cpu.y, cpu)
+	update_flags_nz(cpu.x, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_dey(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_dey(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.y--
 	update_flags_nz(cpu.y, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_inc(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_inc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	v := modeOpsTable[mode].getValue(cpu) + 1
 	modeOpsTable[mode].setValue(cpu, v)
 	update_flags_nz(v, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_inx(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_inx(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.x++
 	update_flags_nz(cpu.x, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_iny(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_iny(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.y++
 	update_flags_nz(cpu.y, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_eor(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_eor(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.a |= modeOpsTable[mode].getValue(cpu)
 	update_flags_nz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_lsr(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_lsr(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	u := modeOpsTable[mode].getValue(cpu)
 	v := u >> 1
 	cpu.p &= ^(P_C | P_Z | P_N)
@@ -694,16 +869,18 @@ func exec_lsr(cpu *Cpu, mode InstMode, bytes uint) {
 	modeOpsTable[mode].setValue(cpu, v)
 	update_flags_nz(v, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_ora(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_ora(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	v := modeOpsTable[mode].getValue(cpu)
 	cpu.a |= v
 	update_flags_nz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_rol(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_rol(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	oldCarry := cpu.p & P_C
 	u := modeOpsTable[mode].getValue(cpu)
 	v := u << 1
@@ -720,9 +897,10 @@ func exec_rol(cpu *Cpu, mode InstMode, bytes uint) {
 		cpu.p |= P_Z
 	}
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_ror(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_ror(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	u := modeOpsTable[mode].getValue(cpu)
 	v := u >> 1
 	if cpu.p&P_C != 0 {
@@ -740,9 +918,10 @@ func exec_ror(cpu *Cpu, mode InstMode, bytes uint) {
 		cpu.p |= P_Z
 	}
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_sbc(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_sbc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	orig_a := cpu.a
 	m := modeOpsTable[mode].getValue(cpu)
 	c := uint8(0)
@@ -761,129 +940,141 @@ func exec_sbc(cpu *Cpu, mode InstMode, bytes uint) {
 
 	update_flags_nz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_pha(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_pha(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.push8(cpu.a)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_php(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_php(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.push8(cpu.p)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_pla(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_pla(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.a = cpu.pop8()
 	update_flags_nz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_plp(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_plp(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p = cpu.pop8()
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_jsr(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_jsr(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.push16(uint16(cpu.pc + 2))
 	cpu.pc = get_addr_abs(cpu)
+	return instTable[opc].cycle
 }
 
-func exec_rts(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_rts(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.pc = cpu.pop16()
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_rti(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_rti(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p = cpu.pop8()
 	cpu.pc = cpu.pop16()
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_bcc(cpu *Cpu, mode InstMode, bytes uint) {
-	if cpu.p&P_C == 0 {
-		cpu.pc += uint16(get_value_imm(cpu))
+func exec_branch_gen(cpu *Cpu, opc uint8, mode InstMode, bytes uint, v bool) uint {
+	var extracycle uint = 0
+	if v {
+		extracycle = 1
+		nextpc := cpu.pc + uint16(bytes)
+		cpu.pc = uint16(int(nextpc) + int(int8(get_value_imm(cpu))))
+		if nextpc>>8 != cpu.pc>>8 {
+			extracycle = 2
+		}
+	} else {
+		cpu.pc += uint16(bytes)
 	}
-	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle + extracycle
 }
 
-func exec_bcs(cpu *Cpu, mode InstMode, bytes uint) {
-	if cpu.p&P_C != 0 {
-		cpu.pc += uint16(get_value_imm(cpu))
-	}
-	cpu.pc += uint16(bytes)
+func exec_bmi(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_N != 0)
 }
 
-func exec_beq(cpu *Cpu, mode InstMode, bytes uint) {
-	if cpu.p&P_Z != 0 {
-		cpu.pc += uint16(get_value_imm(cpu))
-	}
-	cpu.pc += uint16(bytes)
+func exec_bcc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_C == 0)
 }
 
-func exec_bne(cpu *Cpu, mode InstMode, bytes uint) {
-	if cpu.p&P_Z == 0 {
-		cpu.pc = uint16(int(cpu.pc) + int(int8(get_value_imm(cpu))))
-	}
-	cpu.pc += uint16(bytes)
+func exec_bcs(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_C != 0)
 }
 
-func exec_bpl(cpu *Cpu, mode InstMode, bytes uint) {
-	if cpu.p&P_N == 0 {
-		cpu.pc += uint16(get_value_imm(cpu))
-	}
-	cpu.pc += uint16(bytes)
+func exec_beq(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_Z != 0)
 }
 
-func exec_bvc(cpu *Cpu, mode InstMode, bytes uint) {
-	if cpu.p&P_V == 0 {
-		cpu.pc += uint16(get_value_imm(cpu))
-	}
-	cpu.pc += uint16(bytes)
+func exec_bne(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_Z == 0)
 }
 
-func exec_bvs(cpu *Cpu, mode InstMode, bytes uint) {
-	if cpu.p&P_V != 0 {
-		cpu.pc += uint16(get_value_imm(cpu))
-	}
-	cpu.pc += uint16(bytes)
+func exec_bpl(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_N == 0)
 }
 
-func exec_clc(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_bvc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_V == 0)
+}
+
+func exec_bvs(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_V != 0)
+}
+
+func exec_clc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p &= ^P_C
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_cli(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_cli(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p &= ^P_I
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_clv(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_clv(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p &= ^P_V
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_sec(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_sec(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p |= P_C
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_sei(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_sei(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p |= P_I
 	cpu.pc += uint16(bytes)
+	return instTable[opc].cycle
 }
 
-func exec_brk(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_brk(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.push16(cpu.pc)
 	cpu.push8(cpu.p)
 	cpu.pc = cpu.mem.Read16(VEC_IRQ)
 	cpu.p |= P_B
+	return instTable[opc].cycle
 }
 
-func exec_nop(cpu *Cpu, mode InstMode, bytes uint) {
+func exec_nop(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.pc += uint16(bytes)
-	return
+	return instTable[opc].cycle
 }
 
 func (cpu *Cpu) setNmi() {
@@ -904,8 +1095,7 @@ func (cpu *Cpu) executeInst() uint {
 	mode := instTable[opc].mode
 	bytes := instTable[opc].bytes
 	Debug("%08X: %s %-10s    opc=%02Xh\n", pc, instTable[opc].mnemonic, modeOpsTable[mode].getOpdString(cpu, pc), opc)
-	instTable[opc].handler(cpu, mode, bytes)
-	cycle := instTable[opc].cycle
+	cycle := instHandlerTable[opc](cpu, opc, mode, bytes)
 
 	return cycle
 }
