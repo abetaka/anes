@@ -187,7 +187,11 @@ func main() {
 	nes := nespkg.NewNes(display)
 	if len(flag.Args()) >= 1 {
 		nespkg.Debug("loading: %s\n", flag.Arg(0))
-		nes.LoadRom(flag.Arg(0))
+		err := nes.LoadRom(flag.Arg(0))
+		if err != nil {
+			fmt.Println("ROM format error")
+			return
+		}
 	} else {
 		nespkg.Debug("invalid argument\n")
 		return

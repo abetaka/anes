@@ -33,11 +33,20 @@ func (m *MainMemory) Read8(address uint16) uint8 {
 	return m.mem[page(address)][offset(address)]
 }
 
-func (m *MainMemory) Write8(address uint16, value uint8) {
-	if isPpuRegAddress(address) {
-		m.nes.ppu.writeMmapReg(address, value)
-	} else {
-		m.mem[page(address)][offset(address)] = value
+func (m *MainMemory) isRam(address uint16) bool {
+	if address >= 0 && address < 0x2000 {
+		return true
+	}
+	return false
+}
+
+func (m *MainMemory) Write8(address uint16, val uint8) {
+	if m.isRam(address) {
+		m.mem[page(address)][offset(address)] = val
+	} else if isPpuRegAddress(address) {
+		m.nes.ppu.writeMmapReg(address, val)
+	} else if address >= 0x8000 && address <= 0xffff {
+		m.nes.mapper.regWrite8(address, val)
 	}
 }
 
@@ -71,4 +80,10 @@ func NewMainMemory(nes *Nes) *MainMemory {
 	}
 	m.nes = nes
 	return m
+}
+
+func (m *MainMemory) mapExtMem(address uint16, extmem []uint8, bytes int) {
+	for i := uint16(0); i < uint16(bytes); i += mmPageSize {
+		m.mem[page(address+i)] = extmem[i : i+mmPageSize]
+	}
 }

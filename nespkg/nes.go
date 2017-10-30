@@ -10,11 +10,17 @@ func bits(v uint, pos uint, width uint) uint {
 	return (v >> pos) & ((1 << width) - 1)
 }
 
+type Mapper interface {
+	Init()
+	regWrite8(address uint16, val uint8)
+}
+
 type Nes struct {
 	cpu     *Cpu
 	ppu     *Ppu
 	mem     *MainMemory
 	rom     *NesRom
+	mapper  Mapper
 	display Display
 }
 
@@ -124,21 +130,6 @@ func (rom *NesRom) PrintRomData() {
 	Debug("tvSystem=%d\n", rom.tvSystem)
 }
 
-func (nes *Nes) LoadRomOnCpuMemory(rom *NesRom) {
-	if rom.mapperNum == 0 {
-		for i := range rom.prgRom {
-			nes.mem.Write8(0x8000+uint16(i), rom.prgRom[i])
-		}
-		if rom.prgRomSizeIn16KB == 1 {
-			nes.mem.setNrom128Mirror()
-		}
-
-		for i := range rom.chrRom {
-			nes.ppu.vramWrite8(uint16(i), rom.chrRom[i])
-		}
-	}
-}
-
 func (nes *Nes) LoadRom(filename string) error {
 	f, err := os.Open(filename)
 	romImage := make([]byte, maxRomImageSize)
@@ -156,11 +147,8 @@ func (nes *Nes) LoadRom(filename string) error {
 	Debug("ROM header analyzed\n")
 	rom.PrintRomData()
 	nes.rom = rom
-	for i := uint16(0); i < 0x4000; i++ {
-		nes.mem.Write8(0x8000+i, rom.prgRom[i])
-	}
-	Debug("calling LoadRomOnCpuMemory\n")
-	nes.LoadRomOnCpuMemory(rom)
+	nes.mapper = NewMapperBase(nes)
+	nes.mapper.Init()
 	Debug("calling PostRomLoadSetup\n")
 	nes.ppu.PostRomLoadSetup()
 	Debug("returning from LoadRom\n")

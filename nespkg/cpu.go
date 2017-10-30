@@ -1094,8 +1094,9 @@ func (cpu *Cpu) executeInst() uint {
 	opc := cpu.mem.Read8(cpu.pc)
 	mode := instTable[opc].mode
 	bytes := instTable[opc].bytes
-	Debug("%08X: %s %-10s    opc=%02Xh\n", pc, instTable[opc].mnemonic, modeOpsTable[mode].getOpdString(cpu, pc), opc)
+	Debug("%08X: %s %-10s    opc=%02Xh cycle=", pc, instTable[opc].mnemonic, modeOpsTable[mode].getOpdString(cpu, pc), opc)
 	cycle := instHandlerTable[opc](cpu, opc, mode, bytes)
+	Debug("%d\n", cycle)
 
 	return cycle
 }

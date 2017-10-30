@@ -32,7 +32,8 @@ type Ppu struct {
 	ppuaddrw        bool
 	vram            [vramSize]uint8
 	lvram           [vramPages][]uint8
-	patterntable    [2][]uint8
+	patterntableBg  uint16
+	patterntableSp  uint16
 	nametable       [4][]uint8
 	attributetable  [4][]uint8
 	oam             [4 * 64]uint8
@@ -270,12 +271,11 @@ func (ppu *Ppu) renderPixel(col uint, row uint) {
 	nametableIndex := getNametableIndex(x, y)
 	nametable := ppu.nametable[nametableIndex]
 
-	indexInNametable := getIndexInNametable(x, y)
-	patternIndex := uint(nametable[indexInNametable])*patternEntryBytes + y%tileSize
+	index := getIndexInNametable(x, y)
+	patternIndex := uint16(uint(nametable[index])*patternEntryBytes + y%tileSize)
 
-	patterntable := ppu.patterntable[0]
-	lo := patterntable[patternIndex]
-	hi := patterntable[patternIndex+hiOffset]
+	lo := ppu.vramRead8(ppu.patterntableBg + patternIndex)
+	hi := ppu.vramRead8(ppu.patterntableBg + patternIndex + hiOffset)
 
 	attributetable := ppu.attributetable[nametableIndex]
 	paletteIndex := getPaletteIndex(attributetable, x, y)
@@ -301,6 +301,17 @@ func vramOffest(a uint16) uint {
 	return uint(a) & (vramPageSize - 1)
 }
 
+func (ppu *Ppu) mapExtMem(address uint16, extmem []uint8, bytes int) {
+	for i := uint16(0); i < uint16(bytes); i += vramPageSize {
+		ppu.lvram[vramPage(address+i)] = extmem[i : i+vramPageSize]
+	}
+	/*
+		for i := uint16(0); i < uint16(bytes); i++ {
+			ppu.vram[address+i] = extmem[i]
+		}
+	*/
+}
+
 func (ppu *Ppu) vramWrite8(address uint16, v uint8) {
 	ppu.lvram[vramPage(address)][vramOffest(address)] = v
 }
@@ -321,6 +332,7 @@ func toPpuClockDelta(cpuclockDelta uint) uint {
 
 const firstVisibleScanline = 0
 const lastVisibleScanline = 239
+const postRenderScanline = 240
 const firstVBlankScanline = 241
 const preRenderScanline = 261
 const numScanlines = 262
@@ -334,7 +346,9 @@ func (ppu *Ppu) giveCpuClockDelta(cpuclockDelta uint) {
 	for row := ppu.currentScanline; ppu.clock >= scanlineToClock(row); row++ {
 		if row >= firstVisibleScanline && row <= lastVisibleScanline {
 			ppu.renderScanline(row)
-		} else if row == firstVBlankScanline {
+		}
+
+		if row == postRenderScanline {
 			Debug("firstVBlankScanline\n")
 			ppu.ppustatus |= PPUSTATUS_V
 			if ppu.vblankNmi() {
@@ -374,6 +388,7 @@ func NewPpu(nes *Nes) *Ppu {
 
 func (ppu *Ppu) PostRomLoadSetup() {
 	rom := ppu.nes.rom
+
 	//
 	// Nametable mirror
 	//
@@ -400,8 +415,8 @@ func (ppu *Ppu) PostRomLoadSetup() {
 	// Map Pattern Tables
 	//
 	Debug("Map pattern tables\n")
-	ppu.patterntable[0] = ppu.vram[0:0x1000]
-	ppu.patterntable[1] = ppu.vram[0x1000:0x2000]
+	ppu.patterntableBg = 0
+	ppu.patterntableSp = 0x1000
 
 	//
 	// Map Name Tables and Attribute Tables
