@@ -10,11 +10,6 @@ func bits(v uint, pos uint, width uint) uint {
 	return (v >> pos) & ((1 << width) - 1)
 }
 
-type Mapper interface {
-	Init()
-	regWrite8(address uint16, val uint8)
-}
-
 type Nes struct {
 	cpu     *Cpu
 	ppu     *Ppu
@@ -70,7 +65,7 @@ type NesRom struct {
 	batteryBackedPrgRam bool
 	trainerPresent      bool
 	fourScreenVram      bool
-	mapperNum           uint
+	mapperNum           int
 	vsUnisystem         bool
 	playChoice10        bool
 	nes2format          bool
@@ -91,7 +86,7 @@ func NewNesRom(filename string, romImage []uint8) (*NesRom, error) {
 	rom.batteryBackedPrgRam = romImage[6]&0x02 != 0
 	rom.trainerPresent = romImage[6]&0x04 != 0
 	rom.fourScreenVram = romImage[6]&0x08 != 0
-	rom.mapperNum = uint(((romImage[6] & 0xf0) >> 4) | (romImage[7] & 0xf0))
+	rom.mapperNum = int(((romImage[6] & 0xf0) >> 4) | (romImage[7] & 0xf0))
 	rom.vsUnisystem = romImage[7]&0x01 != 0
 	rom.playChoice10 = romImage[7]&0x02 != 0
 	rom.nes2format = (romImage[7]&0x0c)>>2 == 2
@@ -147,7 +142,7 @@ func (nes *Nes) LoadRom(filename string) error {
 	Debug("ROM header analyzed\n")
 	rom.PrintRomData()
 	nes.rom = rom
-	nes.mapper = NewMapperBase(nes)
+	nes.mapper = MakeMapper(nes, rom.mapperNum)
 	nes.mapper.Init()
 	Debug("calling PostRomLoadSetup\n")
 	nes.ppu.PostRomLoadSetup()
