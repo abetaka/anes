@@ -32,14 +32,15 @@ type Ppu struct {
 	ppuaddrw        bool
 	vram            [vramSize]uint8
 	lvram           [vramPages][]uint8
-	patterntableBg  uint16
-	patterntableSp  uint16
+	patternTable    [2]uint16
 	nametable       [4][]uint8
 	attributetable  [4][]uint8
 	oam             [4 * 64]uint8
 	bgPalette       [4][]uint8
 	spritePalette   [4][]uint8
 	screen          [ScreenSizePixY][ScreenSizePixX]uint8
+	oamScreen       [ScreenSizePixY][ScreenSizePixX]uint8
+	oamMask         [ScreenSizePixY][ScreenSizePixX]uint8
 	oddframe        bool
 	currentScanline uint
 	clock           uint
@@ -93,16 +94,24 @@ func (ppu *Ppu) vramIncMode() uint {
 	return bits(uint(ppu.ppuctrl), 2, 1)
 }
 
-func (ppu *Ppu) spritePatternTableAddress8x8() uint {
-	return bits(uint(ppu.ppuctrl), 3, 1)
+func (ppu *Ppu) spritePatternBase8x8() uint16 {
+	if bits(uint(ppu.ppuctrl), 3, 1) == 0 {
+		return 0
+	} else {
+		return 0x1000
+	}
 }
 
-func (ppu *Ppu) bgPatternTableAddress() uint {
-	return bits(uint(ppu.ppuctrl), 4, 1)
+func (ppu *Ppu) bgPatternBase() uint16 {
+	if bits(uint(ppu.ppuctrl), 4, 1) == 0 {
+		return 0
+	} else {
+		return 0x1000
+	}
 }
 
-func (ppu *Ppu) spriteSize() uint {
-	return bits(uint(ppu.ppuctrl), 5, 1)
+func (ppu *Ppu) spriteSize8x8() bool {
+	return bits(uint(ppu.ppuctrl), 5, 1) == 0
 }
 
 func (ppu *Ppu) ppuMasterSlave() uint {
@@ -152,6 +161,7 @@ func (ppu *Ppu) emphasizeBlue() uint {
 func (ppu *Ppu) readPpustatus() uint8 {
 	v := ppu.ppustatus
 	ppu.ppustatus &= ^PPUSTATUS_V
+	Debug("ppustatus=%02Xh\n", v)
 	return v
 }
 
@@ -274,8 +284,8 @@ func (ppu *Ppu) renderPixel(col uint, row uint) {
 	index := getIndexInNametable(x, y)
 	patternIndex := uint16(uint(nametable[index])*patternEntryBytes + y%tileSize)
 
-	lo := ppu.vramRead8(ppu.patterntableBg + patternIndex)
-	hi := ppu.vramRead8(ppu.patterntableBg + patternIndex + hiOffset)
+	lo := ppu.vramRead8(ppu.bgPatternBase() + patternIndex)
+	hi := ppu.vramRead8(ppu.bgPatternBase() + patternIndex + hiOffset)
 
 	attributetable := ppu.attributetable[nametableIndex]
 	paletteIndex := getPaletteIndex(attributetable, x, y)
@@ -341,6 +351,66 @@ func scanlineToClock(row uint) uint {
 	return (row + 1) * 341
 }
 
+type Sprite struct {
+	oam []uint8
+}
+
+func (ppu *Ppu) getSprite(index int) *Sprite {
+	sp := new(Sprite)
+	sp.oam = ppu.oam[4*index : 4*(index+1)]
+	return sp
+}
+
+func (sp *Sprite) posX() uint8 {
+	return sp.oam[3]
+}
+
+func (sp *Sprite) posY() uint8 {
+	return sp.oam[0]
+}
+
+func (sp *Sprite) patternAddress(ppu *Ppu) uint16 {
+	if ppu.spriteSize8x8() {
+		return uint16(sp.oam[1])*16 + ppu.spritePatternBase8x8()
+	}
+	return uint16(sp.oam[1]&0xfe)*16 + uint16(sp.oam[1]&0x01)<<12
+}
+
+func (sp *Sprite) palette() int {
+	return int(bits(uint(sp.oam[2]), 0, 2) + 4)
+}
+
+func (sp *Sprite) priority() int {
+	return int(bits(uint(sp.oam[2]), 5, 1))
+}
+
+func (sp *Sprite) hflip() bool {
+	return bits(uint(sp.oam[2]), 6, 1) == 1
+}
+
+func (sp *Sprite) vflip() bool {
+	return bits(uint(sp.oam[2]), 7, 1) == 1
+}
+
+func (ppu *Ppu) preRenderSprite(spriteIndex int) {
+	sp := ppu.getSprite(spriteIndex)
+	x := sp.posX()
+	y := sp.posY()
+	ppu.oamScreen[y][x] = 0
+}
+
+func (ppu *Ppu) prepSpriteScreens() {
+	for _, line := range ppu.oamScreen {
+		for i := range line {
+			line[i] = 0
+		}
+	}
+
+	for i := 0; i < 64; i++ {
+		ppu.preRenderSprite(i)
+	}
+}
+
 func (ppu *Ppu) giveCpuClockDelta(cpuclockDelta uint) {
 	ppu.clock += toPpuClockDelta(cpuclockDelta)
 	for row := ppu.currentScanline; ppu.clock >= scanlineToClock(row); row++ {
@@ -361,8 +431,12 @@ func (ppu *Ppu) giveCpuClockDelta(cpuclockDelta uint) {
 			ppu.nes.display.Render(&ppu.screen)
 		}
 
-		if row == preRenderScanline {
+		if row == preRenderScanline-1 {
+			ppu.prepSpriteScreens()
 			ppu.ppustatus &= ^PPUSTATUS_V
+		}
+
+		if row == preRenderScanline {
 			ppu.currentScanline = 0
 			ppu.clock = 0
 		} else {
@@ -415,8 +489,8 @@ func (ppu *Ppu) PostRomLoadSetup() {
 	// Map Pattern Tables
 	//
 	Debug("Map pattern tables\n")
-	ppu.patterntableBg = 0
-	ppu.patterntableSp = 0x1000
+	ppu.patternTable[0] = 0
+	ppu.patternTable[1] = 0x1000
 
 	//
 	// Map Name Tables and Attribute Tables

@@ -403,7 +403,7 @@ func (c *Cpu) Reset() {
 	c.a = 0
 	c.x = 0
 	c.y = 0
-	c.s = 0xfa
+	c.s = 0xfd
 	c.p = 0x34
 	c.pc = c.nes.mem.Read16(VEC_RESET)
 	Debug("reset vector = %x\n", c.nes.mem.Read16(VEC_RESET))
@@ -427,18 +427,17 @@ func (cpu *Cpu) push8(v uint8) {
 
 func (cpu *Cpu) pop8() uint8 {
 	cpu.s++
-	v := cpu.mem.Read8(stackBase + uint16(cpu.s))
-	return v
+	return cpu.mem.Read8(stackBase + uint16(cpu.s))
 }
 
 func (cpu *Cpu) push16(v uint16) {
-	cpu.mem.Write16(stackBase+uint16(cpu.s), v)
-	cpu.s -= 2
+	cpu.push8(uint8(v >> 8))
+	cpu.push8(uint8(v & 0x0ff))
 }
 
 func (cpu *Cpu) pop16() uint16 {
-	cpu.s += 2
-	v := cpu.mem.Read16(stackBase + uint16(cpu.s))
+	v := uint16(cpu.pop8())
+	v |= uint16(cpu.pop8()) << 8
 	return v
 }
 
@@ -770,14 +769,14 @@ func cmp_gen(u uint8, v uint8, cpu *Cpu) {
 	if u == v {
 		cpu.p |= P_Z
 	}
-	if (v-u)&0x80 != 0 {
+	if (u-v)&0x80 != 0 {
 		cpu.p |= P_N
 	}
 }
 
 func exec_cmp(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
-	v := modeOpsTable[mode].getValue(cpu)
-	cmp_gen(cpu.a, v, cpu)
+	m := modeOpsTable[mode].getValue(cpu)
+	cmp_gen(cpu.a, m, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
@@ -925,7 +924,7 @@ func exec_sbc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	orig_a := cpu.a
 	m := modeOpsTable[mode].getValue(cpu)
 	c := uint8(0)
-	if cpu.p&P_C != 0 {
+	if cpu.p&P_C == 0 {
 		c = 1
 	}
 	cpu.a = cpu.a - m - c
@@ -1096,7 +1095,7 @@ func (cpu *Cpu) executeInst() uint {
 	bytes := instTable[opc].bytes
 	Debug("%08X: %s %-10s    opc=%02Xh cycle=", pc, instTable[opc].mnemonic, modeOpsTable[mode].getOpdString(cpu, pc), opc)
 	cycle := instHandlerTable[opc](cpu, opc, mode, bytes)
-	Debug("%d\n", cycle)
+	Debug("%d s=%02Xh\n", cycle, cpu.s)
 
 	return cycle
 }
