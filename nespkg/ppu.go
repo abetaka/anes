@@ -10,6 +10,7 @@ const vramSize = 0x4000
 const vramPageShift = 8
 const vramPageSize = 1 << vramPageShift
 const vramPages = vramSize / vramPageSize
+const nullSpIndex = 255
 
 type Ppustatus struct {
 	data uint8
@@ -37,10 +38,10 @@ type Ppu struct {
 	attributetable  [4][]uint8
 	oam             [4 * 64]uint8
 	bgPalette       [4][]uint8
-	spritePalette   [4][]uint8
+	spPalette       [4][]uint8
 	screen          [ScreenSizePixY][ScreenSizePixX]uint8
 	oamScreen       [ScreenSizePixY][ScreenSizePixX]uint8
-	oamMask         [ScreenSizePixY][ScreenSizePixX]uint8
+	oamMap          [ScreenSizePixY][ScreenSizePixX]uint8
 	oddframe        bool
 	currentScanline uint
 	clock           uint
@@ -94,7 +95,7 @@ func (ppu *Ppu) vramIncMode() uint {
 	return bits(uint(ppu.ppuctrl), 2, 1)
 }
 
-func (ppu *Ppu) spritePatternBase8x8() uint16 {
+func (ppu *Ppu) sprite8x8PatternBase() uint16 {
 	if bits(uint(ppu.ppuctrl), 3, 1) == 0 {
 		return 0
 	} else {
@@ -260,7 +261,7 @@ func getPaletteIndex(attributetable []uint8, x uint, y uint) uint8 {
 
 	u := x % ScreenSizePixX
 	v := y % ScreenSizePixY
-	index := u/attrMetatileSize + (u/attrMetatileSize)*attrMetatilesInRow
+	index := u/attrMetatileSize + (v/attrMetatileSize)*attrMetatilesInRow
 	attr := attributetable[index]
 	s := (u / attrTileSize) % 2
 	t := (v / attrTileSize) % 2
@@ -295,6 +296,10 @@ func (ppu *Ppu) renderPixel(col uint, row uint) {
 		ppu.screen[row][col] = ppu.bgPalette[0][0]
 	} else {
 		ppu.screen[row][col] = ppu.bgPalette[paletteIndex][pix]
+	}
+
+	if ppu.oamScreen[row][col] != 0 {
+		ppu.screen[row][col] = ppu.oamScreen[row][col]
 	}
 }
 
@@ -352,57 +357,111 @@ func scanlineToClock(row uint) uint {
 }
 
 type Sprite struct {
-	oam []uint8
+	index int
+	oam   []uint8
 }
 
 func (ppu *Ppu) getSprite(index int) *Sprite {
 	sp := new(Sprite)
 	sp.oam = ppu.oam[4*index : 4*(index+1)]
+	sp.index = index
 	return sp
 }
 
-func (sp *Sprite) posX() uint8 {
-	return sp.oam[3]
+func (sp *Sprite) posX() int {
+	return int(sp.oam[3])
 }
 
-func (sp *Sprite) posY() uint8 {
-	return sp.oam[0]
+func (sp *Sprite) posY() int {
+	return int(sp.oam[0])
 }
 
-func (sp *Sprite) patternAddress(ppu *Ppu) uint16 {
+func (sp *Sprite) patternAddress(ppu *Ppu, bottomHalf bool) uint16 {
 	if ppu.spriteSize8x8() {
-		return uint16(sp.oam[1])*16 + ppu.spritePatternBase8x8()
+		return uint16(sp.oam[1])*16 + ppu.sprite8x8PatternBase()
+	} else {
+		base := uint16(sp.oam[1]&0xfe)*16 + uint16(sp.oam[1]&0x01)<<12
+		if bottomHalf {
+			base += 16
+		}
+		return base
 	}
-	return uint16(sp.oam[1]&0xfe)*16 + uint16(sp.oam[1]&0x01)<<12
 }
 
-func (sp *Sprite) palette() int {
-	return int(bits(uint(sp.oam[2]), 0, 2) + 4)
+func (sp *Sprite) paletteIndex() int {
+	return int(bits(uint(sp.oam[2]), 0, 2))
 }
 
 func (sp *Sprite) priority() int {
 	return int(bits(uint(sp.oam[2]), 5, 1))
 }
 
-func (sp *Sprite) hflip() bool {
+func (sp *Sprite) hFlip() bool {
 	return bits(uint(sp.oam[2]), 6, 1) == 1
 }
 
-func (sp *Sprite) vflip() bool {
+func (sp *Sprite) vFlip() bool {
 	return bits(uint(sp.oam[2]), 7, 1) == 1
+}
+
+func (ppu *Ppu) putSpriteTile(sp *Sprite, x int, y int, bottomHalf bool) {
+	base := sp.patternAddress(ppu, bottomHalf)
+	for j := 0; j < 8; j++ {
+		var lo, hi uint8
+		if sp.vFlip() {
+			lo = ppu.vramRead8(base + 7 - uint16(j))
+			hi = ppu.vramRead8(base + 7 - uint16(j) + 8)
+		} else {
+			lo = ppu.vramRead8(base + uint16(j))
+			hi = ppu.vramRead8(base + uint16(j) + 8)
+		}
+		for i := 0; i < 8; i++ {
+			var pix uint
+			if sp.hFlip() {
+				pix = bits(uint(lo), uint(i%8), 1) | (bits(uint(hi), uint(i%8), 1) << 1)
+			} else {
+				pix = bits(uint(lo), uint(7-i%8), 1) | (bits(uint(hi), uint(7-i%8), 1) << 1)
+			}
+			c := uint8(0)
+			if pix != 0 {
+				c = ppu.spPalette[sp.paletteIndex()][pix]
+			}
+
+			ppu.oamScreen[(y+j)%ScreenSizePixY][(x+i)%ScreenSizePixX] = c
+			if c != 0 {
+				ppu.oamMap[(y+j)%ScreenSizePixY][(x+i)%ScreenSizePixX] = uint8(sp.index)
+			}
+		}
+	}
 }
 
 func (ppu *Ppu) preRenderSprite(spriteIndex int) {
 	sp := ppu.getSprite(spriteIndex)
 	x := sp.posX()
 	y := sp.posY()
-	ppu.oamScreen[y][x] = 0
+	ppu.putSpriteTile(sp, x, y, false)
+	if !ppu.spriteSize8x8() {
+		ppu.putSpriteTile(sp, x, y+8, true)
+	}
 }
 
-func (ppu *Ppu) prepSpriteScreens() {
-	for _, line := range ppu.oamScreen {
+func (ppu *Ppu) prepSprite() {
+	/*
+		for _, line := range ppu.oamScreen {
+			for i := range line {
+				line[i] = 0
+			}
+		}
+	*/
+	for i := 0; i < ScreenSizePixY; i++ {
+		for j := 0; j < ScreenSizePixX; j++ {
+			ppu.oamScreen[i][j] = 0
+		}
+	}
+
+	for _, line := range ppu.oamMap {
 		for i := range line {
-			line[i] = 0
+			line[i] = nullSpIndex
 		}
 	}
 
@@ -432,7 +491,8 @@ func (ppu *Ppu) giveCpuClockDelta(cpuclockDelta uint) {
 		}
 
 		if row == preRenderScanline-1 {
-			ppu.prepSpriteScreens()
+			ppu.updatePpuscrolly()
+			ppu.prepSprite()
 			ppu.ppustatus &= ^PPUSTATUS_V
 		}
 
@@ -533,9 +593,9 @@ func (ppu *Ppu) PostRomLoadSetup() {
 	ppu.bgPalette[1] = ppu.vram[0x3f04:0x3f08]
 	ppu.bgPalette[2] = ppu.vram[0x3f08:0x3f0c]
 	ppu.bgPalette[3] = ppu.vram[0x3f0c:0x3f10]
-	ppu.spritePalette[0] = ppu.vram[0x3f11:0x3f14]
-	ppu.spritePalette[1] = ppu.vram[0x3f15:0x3f18]
-	ppu.spritePalette[2] = ppu.vram[0x3f19:0x3f1c]
-	ppu.spritePalette[3] = ppu.vram[0x3f1d:0x3f20]
+	ppu.spPalette[0] = ppu.vram[0x3f10:0x3f14]
+	ppu.spPalette[1] = ppu.vram[0x3f14:0x3f18]
+	ppu.spPalette[2] = ppu.vram[0x3f18:0x3f1c]
+	ppu.spPalette[3] = ppu.vram[0x3f1c:0x3f20]
 
 }
