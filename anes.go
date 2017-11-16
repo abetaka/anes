@@ -102,18 +102,39 @@ func (mcw *MyCustomWidget) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uin
 			nespkg.Debug("creating timer routine\n")
 			go myGoRoutine(mcw)
 			mcw.myGoRoutineCreated = true
+			nespkg.Debug("goroutine created\n")
 		}
+	case win.WM_KEYDOWN:
+		nespkg.Debug("KeyDown\n")
+	case win.WM_KEYUP:
+		nespkg.Debug("KeyUp\n")
 	}
 	return mcw.CustomWidget.WndProc(hwnd, msg, wParam, lParam)
 }
 
-func (mw *MyMainWindow) mouseDownHandler(x, y int, button walk.MouseButton) {
-	nespkg.Debug("MouseButtonDown: %d\n", button)
-	mw.paintWidget.Invalidate()
+var gamepadButtonMap = map[walk.Key]nespkg.GamepadButton{
+	walk.KeyH: nespkg.ButtonLeft,
+	walk.KeyJ: nespkg.ButtonDown,
+	walk.KeyK: nespkg.ButtonUp,
+	walk.KeyL: nespkg.ButtonRight,
+	walk.KeyZ: nespkg.ButtonB,
+	walk.KeyX: nespkg.ButtonA,
+	walk.Key1: nespkg.ButtonSelect,
+	walk.Key2: nespkg.ButtonStart,
 }
 
-func (mw *MyMainWindow) keyDownHandler(key walk.Key) {
-	nespkg.Debug("KeyDown: %d\n", key)
+func makeKeyDownHandler(pad *nespkg.Gamepad) func(key walk.Key) {
+	return func(key walk.Key) {
+		nespkg.Debug("KeyDown: %d\n", key)
+		pad.SetButtonState(gamepadButtonMap[key], true)
+	}
+}
+
+func makeKeyUpHandler(pad *nespkg.Gamepad) func(key walk.Key) {
+	return func(key walk.Key) {
+		nespkg.Debug("KeyUp: %d\n", key)
+		pad.SetButtonState(gamepadButtonMap[key], false)
+	}
 }
 
 func makePaintFunc(display *NesDisplay) func(canvas *walk.Canvas, updateBounds walk.Rectangle) error {
@@ -160,10 +181,12 @@ func createBitmap(display *NesDisplay) (*walk.Bitmap, error) {
 func runMyWidget(display *NesDisplay, nes *nespkg.Nes) {
 	var mw *walk.MainWindow
 	if err := (MainWindow{
-		AssignTo: &mw,
-		Title:    "ANES",
-		Size:     Size{nespkg.ScreenSizePixX * 2, nespkg.ScreenSizePixY * 2},
-		Layout:   VBox{MarginsZero: true},
+		AssignTo:  &mw,
+		Title:     "ANES",
+		Size:      Size{nespkg.ScreenSizePixX * 2, nespkg.ScreenSizePixY * 2},
+		OnKeyDown: makeKeyDownHandler(nes.Pad),
+		OnKeyUp:   makeKeyUpHandler(nes.Pad),
+		Layout:    VBox{MarginsZero: true},
 	}).Create(); err != nil {
 		log.Fatal(err)
 	}

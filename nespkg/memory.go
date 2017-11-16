@@ -18,6 +18,13 @@ func isPpuRegAddress(address uint16) bool {
 	return (ppuAddress >= 0x2000 && ppuAddress <= 0x2007)
 }
 
+func isGamepadAddress(address uint16) bool {
+	if address == 0x4016 {
+		return true
+	}
+	return false
+}
+
 func page(address uint16) uint {
 	return (uint(address) >> mmPageShift)
 }
@@ -29,6 +36,8 @@ func offset(address uint16) uint {
 func (m *MainMemory) Read8(address uint16) uint8 {
 	if isPpuRegAddress(address) {
 		return m.nes.ppu.readMmapReg(address)
+	} else if isGamepadAddress(address) {
+		return m.nes.Pad.regRead(address)
 	}
 	return m.mem[page(address)][offset(address)]
 }
@@ -45,6 +54,8 @@ func (m *MainMemory) Write8(address uint16, val uint8) {
 		m.mem[page(address)][offset(address)] = val
 	} else if isPpuRegAddress(address) {
 		m.nes.ppu.writeMmapReg(address, val)
+	} else if isGamepadAddress(address) {
+		m.nes.Pad.regWrite(address, val)
 	} else if address >= 0x8000 && address <= 0xffff {
 		m.nes.mapper.regWrite8(address, val)
 	}

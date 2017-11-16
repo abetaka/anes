@@ -13,6 +13,7 @@ func bits(v uint, pos uint, width uint) uint {
 type Nes struct {
 	cpu     *Cpu
 	ppu     *Ppu
+	Pad     *Gamepad
 	mem     *MainMemory
 	rom     *NesRom
 	mapper  Mapper
@@ -46,6 +47,7 @@ func NewNes(d Display) *Nes {
 	nes.mem = NewMainMemory(nes)
 	nes.cpu.mem = nes.mem
 	nes.display = d
+	nes.Pad = NewGamepad()
 	Debug("NewNes: nes=%p\n", nes)
 	return nes
 }
