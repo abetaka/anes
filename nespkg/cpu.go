@@ -703,19 +703,16 @@ func exec_tay(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 
 func exec_adc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	a_prev := cpu.a
-	c := uint16(0)
-	if cpu.p&P_C != 0 {
-		c = 1
-	}
 	m := modeOpsTable[mode].getValue(cpu)
-	u := uint16(cpu.a) + uint16(m) + c
+	u := uint16(cpu.a) + uint16(m) + uint16(cpu.p&P_C)
+	v := int(int8(a_prev)) + int(int8(m)) + int(cpu.p&P_C)
 	cpu.a = uint8(u)
 
 	cpu.p &= ^(P_C | P_V)
 	if u >= 0x100 {
 		cpu.p |= P_C
 	}
-	if a_prev&0x80 != cpu.a&0x80 {
+	if v < -128 || v > 127 {
 		cpu.p |= P_V
 	}
 	update_flags_nz(cpu.a, cpu)
@@ -852,7 +849,7 @@ func exec_iny(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 }
 
 func exec_eor(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
-	cpu.a |= modeOpsTable[mode].getValue(cpu)
+	cpu.a ^= modeOpsTable[mode].getValue(cpu)
 	update_flags_nz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
@@ -921,22 +918,17 @@ func exec_ror(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 }
 
 func exec_sbc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
-	orig_a := cpu.a
+	a_prev := cpu.a
 	m := modeOpsTable[mode].getValue(cpu)
-	c := uint8(0)
-	if cpu.p&P_C == 0 {
-		c = 1
-	}
-	cpu.a = cpu.a - m - c
-
+	cpu.a = cpu.a - m - (1 - cpu.p&P_C)
+	u := int(int8(a_prev)) - int(int8(m)) - int(1-cpu.p&P_C)
 	cpu.p &= ^(P_C | P_V)
-	if orig_a <= cpu.a {
+	if a_prev >= m {
 		cpu.p |= P_C
 	}
-	if orig_a&0x80 != cpu.a&0x80 {
+	if u < -128 || u > 127 {
 		cpu.p |= P_V
 	}
-
 	update_flags_nz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
@@ -1089,13 +1081,14 @@ func (cpu *Cpu) executeInst() uint {
 		cpu.pc = cpu.mem.Read16(VEC_NMI)
 	}
 
-	pc := cpu.pc
 	opc := cpu.mem.Read8(cpu.pc)
 	mode := instTable[opc].mode
 	bytes := instTable[opc].bytes
-	Debug("%08X: %s %-10s    opc=%02Xh cycle=", pc, instTable[opc].mnemonic, modeOpsTable[mode].getOpdString(cpu, pc), opc)
+	Debug("%04X: %s %-10s    opc=%02Xh A:%02X X:%02X P:%02X SP:%02X\n",
+		cpu.pc, instTable[opc].mnemonic,
+		modeOpsTable[mode].getOpdString(cpu, cpu.pc),
+		opc, cpu.a, cpu.x, cpu.p, cpu.s)
 	cycle := instHandlerTable[opc](cpu, opc, mode, bytes)
-	Debug("%d s=%02Xh\n", cycle, cpu.s)
 
 	return cycle
 }
