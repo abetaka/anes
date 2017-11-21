@@ -83,6 +83,17 @@ var nesPalette = []color.Color{
 	color.RGBA{0x00, 0x00, 0x00, 0xff},
 }
 
+var gamepadButtonMap = map[walk.Key]nespkg.GamepadButton{
+	walk.KeyH: nespkg.ButtonLeft,
+	walk.KeyJ: nespkg.ButtonDown,
+	walk.KeyK: nespkg.ButtonUp,
+	walk.KeyL: nespkg.ButtonRight,
+	walk.KeyZ: nespkg.ButtonB,
+	walk.KeyX: nespkg.ButtonA,
+	walk.Key1: nespkg.ButtonSelect,
+	walk.Key2: nespkg.ButtonStart,
+}
+
 type MyMainWindow struct {
 	*walk.MainWindow
 	paintWidget MyCustomWidget
@@ -110,17 +121,6 @@ func (mcw *MyCustomWidget) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uin
 		nespkg.Debug("KeyUp\n")
 	}
 	return mcw.CustomWidget.WndProc(hwnd, msg, wParam, lParam)
-}
-
-var gamepadButtonMap = map[walk.Key]nespkg.GamepadButton{
-	walk.KeyH: nespkg.ButtonLeft,
-	walk.KeyJ: nespkg.ButtonDown,
-	walk.KeyK: nespkg.ButtonUp,
-	walk.KeyL: nespkg.ButtonRight,
-	walk.KeyZ: nespkg.ButtonB,
-	walk.KeyX: nespkg.ButtonA,
-	walk.Key1: nespkg.ButtonSelect,
-	walk.Key2: nespkg.ButtonStart,
 }
 
 func makeKeyDownHandler(pad *nespkg.Gamepad) func(key walk.Key) {

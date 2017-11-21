@@ -515,7 +515,9 @@ func get_opdstr_zpy(cpu *Cpu, pc uint16) string {
 
 func get_addr_ind(cpu *Cpu) uint16 {
 	a := cpu.mem.Read16(cpu.pc + 1)
-	return cpu.mem.Read16(a)
+	lo := cpu.mem.Read8(a)
+	hi := cpu.mem.Read8(a&0xff00 | uint16(uint8(a&0x0ff)+1))
+	return uint16(hi)<<8 | uint16(lo)
 }
 
 func get_opdstr_ind(cpu *Cpu, pc uint16) string {
@@ -571,7 +573,10 @@ func get_opdstr_aby(cpu *Cpu, pc uint16) string {
 }
 
 func get_addr_inx(cpu *Cpu) uint16 {
-	return cpu.mem.Read16(get_addr_zpx(cpu))
+	a := get_value_imm(cpu) + cpu.x
+	u := uint16(cpu.mem.Read8(uint16(a)))
+	u |= uint16(cpu.mem.Read8(uint16(a+1))) << 8
+	return u
 }
 
 func get_value_inx(cpu *Cpu) uint8 {
@@ -587,7 +592,10 @@ func get_opdstr_inx(cpu *Cpu, pc uint16) string {
 }
 
 func get_addr_iny(cpu *Cpu) uint16 {
-	return cpu.mem.Read16(get_addr_zrp(cpu)) + uint16(cpu.y)
+	a := get_value_imm(cpu)
+	lo := cpu.mem.Read8(uint16(a))
+	hi := cpu.mem.Read8(uint16(a + 1))
+	return (uint16(hi)<<8 | uint16(lo)) + uint16(cpu.y)
 }
 
 func get_value_iny(cpu *Cpu) uint8 {
@@ -954,7 +962,7 @@ func exec_pla(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 }
 
 func exec_plp(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
-	cpu.p = cpu.pop8()
+	cpu.p = cpu.pop8() | P_R
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
@@ -972,9 +980,8 @@ func exec_rts(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 }
 
 func exec_rti(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
-	cpu.p = cpu.pop8()
+	cpu.p = cpu.pop8() | P_R
 	cpu.pc = cpu.pop16()
-	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
@@ -1076,7 +1083,7 @@ func (cpu *Cpu) executeInst() uint {
 	if cpu.nmiLatched {
 		Debug("NMI latched\n")
 		cpu.nmiLatched = false
-		cpu.push16(cpu.pc - 1)
+		cpu.push16(cpu.pc)
 		cpu.push8(cpu.p)
 		cpu.pc = cpu.mem.Read16(VEC_NMI)
 	}
