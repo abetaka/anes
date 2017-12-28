@@ -1,6 +1,7 @@
 package nespkg
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -58,7 +59,7 @@ type ModeOps struct {
 	getAddress   func(cpu *Cpu) uint16
 	getValue     func(cpu *Cpu) uint8
 	setValue     func(cpu *Cpu, v uint8)
-	getOpdString func(cpu *Cpu, pc uint16) string
+	getOpdString func(mem Memory, pc uint16) string
 }
 
 var modeOpsTable = map[InstMode]ModeOps{
@@ -399,6 +400,13 @@ type Cpu struct {
 	mem        *MainMemory
 }
 
+type Memory interface {
+	Read8(uint16) uint8
+	Read16(uint16) uint16
+	Write8(uint16, uint8)
+	Write16(uint16, uint16)
+}
+
 func (c *Cpu) Reset() {
 	c.a = 0
 	c.x = 0
@@ -449,7 +457,7 @@ func set_value_acc(cpu *Cpu, v uint8) {
 	cpu.a = v
 }
 
-func get_opdstr_acc(cpu *Cpu, pc uint16) string {
+func get_opdstr_acc(mem Memory, pc uint16) string {
 	return "A"
 }
 
@@ -457,11 +465,11 @@ func get_value_imm(cpu *Cpu) uint8 {
 	return cpu.mem.Read8(cpu.pc + 1)
 }
 
-func get_opdstr_imm(cpu *Cpu, pc uint16) string {
-	return fmt.Sprintf("#$%02X", cpu.mem.Read8(pc+1))
+func get_opdstr_imm(mem Memory, pc uint16) string {
+	return fmt.Sprintf("#$%02X", mem.Read8(pc+1))
 }
 
-func get_opdstr_imp(cpu *Cpu, pc uint16) string {
+func get_opdstr_imp(mem Memory, pc uint16) string {
 	return ""
 }
 
@@ -477,8 +485,8 @@ func set_value_zrp(cpu *Cpu, v uint8) {
 	cpu.mem.Write8(get_addr_zrp(cpu), v)
 }
 
-func get_opdstr_zrp(cpu *Cpu, pc uint16) string {
-	return fmt.Sprintf("$%02X", cpu.mem.Read8(pc+1))
+func get_opdstr_zrp(mem Memory, pc uint16) string {
+	return fmt.Sprintf("$%02X", mem.Read8(pc+1))
 }
 
 func get_addr_zpx(cpu *Cpu) uint16 {
@@ -493,8 +501,8 @@ func set_value_zpx(cpu *Cpu, v uint8) {
 	cpu.mem.Write8(get_addr_zpx(cpu), v)
 }
 
-func get_opdstr_zpx(cpu *Cpu, pc uint16) string {
-	return fmt.Sprintf("$%02X,X", cpu.mem.Read8(pc+1))
+func get_opdstr_zpx(mem Memory, pc uint16) string {
+	return fmt.Sprintf("$%02X,X", mem.Read8(pc+1))
 }
 
 func get_addr_zpy(cpu *Cpu) uint16 {
@@ -509,8 +517,8 @@ func set_value_zpy(cpu *Cpu, v uint8) {
 	cpu.mem.Write8(get_addr_zpy(cpu), v)
 }
 
-func get_opdstr_zpy(cpu *Cpu, pc uint16) string {
-	return fmt.Sprintf("$%02X,Y", cpu.mem.Read8(pc+1))
+func get_opdstr_zpy(mem Memory, pc uint16) string {
+	return fmt.Sprintf("$%02X,Y", mem.Read8(pc+1))
 }
 
 func get_addr_ind(cpu *Cpu) uint16 {
@@ -520,8 +528,8 @@ func get_addr_ind(cpu *Cpu) uint16 {
 	return uint16(hi)<<8 | uint16(lo)
 }
 
-func get_opdstr_ind(cpu *Cpu, pc uint16) string {
-	return fmt.Sprintf("($%04X)", cpu.mem.Read16(pc+1))
+func get_opdstr_ind(mem Memory, pc uint16) string {
+	return fmt.Sprintf("($%04X)", mem.Read16(pc+1))
 }
 
 func get_addr_abs(cpu *Cpu) uint16 {
@@ -536,8 +544,8 @@ func set_value_abs(cpu *Cpu, v uint8) {
 	cpu.mem.Write8(get_addr_abs(cpu), v)
 }
 
-func get_opdstr_abs(cpu *Cpu, pc uint16) string {
-	return fmt.Sprintf("$%04X", cpu.mem.Read16(pc+1))
+func get_opdstr_abs(mem Memory, pc uint16) string {
+	return fmt.Sprintf("$%04X", mem.Read16(pc+1))
 }
 
 func get_addr_abx(cpu *Cpu) uint16 {
@@ -552,8 +560,8 @@ func set_value_abx(cpu *Cpu, v uint8) {
 	cpu.mem.Write8(get_addr_abx(cpu), v)
 }
 
-func get_opdstr_abx(cpu *Cpu, pc uint16) string {
-	return fmt.Sprintf("$%04X,x", cpu.mem.Read16(pc+1))
+func get_opdstr_abx(mem Memory, pc uint16) string {
+	return fmt.Sprintf("$%04X,x", mem.Read16(pc+1))
 }
 
 func get_addr_aby(cpu *Cpu) uint16 {
@@ -568,8 +576,8 @@ func set_value_aby(cpu *Cpu, v uint8) {
 	cpu.mem.Write8(get_addr_aby(cpu), v)
 }
 
-func get_opdstr_aby(cpu *Cpu, pc uint16) string {
-	return fmt.Sprintf("$%04X,y", cpu.mem.Read16(pc+1))
+func get_opdstr_aby(mem Memory, pc uint16) string {
+	return fmt.Sprintf("$%04X,y", mem.Read16(pc+1))
 }
 
 func get_addr_inx(cpu *Cpu) uint16 {
@@ -587,8 +595,8 @@ func set_value_inx(cpu *Cpu, v uint8) {
 	cpu.mem.Write8(get_addr_inx(cpu), v)
 }
 
-func get_opdstr_inx(cpu *Cpu, pc uint16) string {
-	return fmt.Sprintf("($%02X,X)", cpu.mem.Read8(pc+1))
+func get_opdstr_inx(mem Memory, pc uint16) string {
+	return fmt.Sprintf("($%02X,X)", mem.Read8(pc+1))
 }
 
 func get_addr_iny(cpu *Cpu) uint16 {
@@ -606,12 +614,13 @@ func set_value_iny(cpu *Cpu, v uint8) {
 	cpu.mem.Write8(get_addr_iny(cpu), v)
 }
 
-func get_opdstr_iny(cpu *Cpu, pc uint16) string {
-	return fmt.Sprintf("($%02X,Y)", cpu.mem.Read8(pc+1))
+func get_opdstr_iny(mem Memory, pc uint16) string {
+	return fmt.Sprintf("($%02X,Y)", mem.Read8(pc+1))
 }
 
-func get_opdstr_rel(cpu *Cpu, pc uint16) string {
-	return fmt.Sprintf("$%02X", int8(cpu.mem.Read8(pc+1)))
+func get_opdstr_rel(mem Memory, pc uint16) string {
+	d := uint16(int(pc+2) + int(int8(mem.Read8(pc+1))))
+	return fmt.Sprintf("$%04X", d)
 }
 
 func update_flags_nz(v uint8, cpu *Cpu) {
@@ -1091,13 +1100,30 @@ func (cpu *Cpu) executeInst() uint {
 	opc := cpu.mem.Read8(cpu.pc)
 	mode := instTable[opc].mode
 	bytes := instTable[opc].bytes
-	Debug("%04X: %s %-10s    opc=%02Xh A:%02X X:%02X P:%02X SP:%02X\n",
-		cpu.pc, instTable[opc].mnemonic,
-		modeOpsTable[mode].getOpdString(cpu, cpu.pc),
-		opc, cpu.a, cpu.x, cpu.p, cpu.s)
+	if cpu.nes.dbg.trace {
+		Debug("%04X: %s %-10s    opc=%02Xh A:%02X X:%02X Y:%02X P:%02X SP:%02X\n",
+			cpu.pc, instTable[opc].mnemonic,
+			modeOpsTable[mode].getOpdString(cpu.mem, cpu.pc),
+			opc, cpu.a, cpu.x, cpu.y, cpu.p, cpu.s)
+	}
 	cycle := instHandlerTable[opc](cpu, opc, mode, bytes)
 
 	return cycle
+}
+
+func GetAsmStr(mem Memory, pc uint16) (error, int, string) {
+	opc := mem.Read8(pc)
+	_, ok := instTable[opc]
+	if !ok {
+		return errors.New("invalid opcode"), 0, "invalid opcode"
+	}
+
+	mode := instTable[opc].mode
+	s := fmt.Sprintf("%04X: %s %-10s",
+		pc,
+		instTable[opc].mnemonic,
+		modeOpsTable[mode].getOpdString(mem, pc))
+	return nil, int(instTable[opc].bytes), s
 }
 
 func NewCpu(nes *Nes) *Cpu {

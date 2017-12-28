@@ -33,7 +33,6 @@ type Ppu struct {
 	ppuaddrw        bool
 	vram            [vramSize]uint8
 	lvram           [vramPages][]uint8
-	patternTable    [2]uint16
 	nametable       [4][]uint8
 	attributetable  [4][]uint8
 	oam             [4 * 64]uint8
@@ -84,6 +83,7 @@ func (ppu *Ppu) readMmapReg(address uint16) uint8 {
 }
 
 func (ppu *Ppu) writePpuctrl(v uint8) {
+	Debug("writePpuctrl: %02Xh\n", v)
 	ppu.ppuctrl = v
 }
 
@@ -127,36 +127,36 @@ func (ppu *Ppu) writePpumask(v uint8) {
 	ppu.ppumask = v
 }
 
-func (ppu *Ppu) greyscale() uint {
-	return bits(uint(ppu.ppumask), 0, 1)
+func (ppu *Ppu) greyscale() bool {
+	return ppu.ppumask&0x01 != 0
 }
 
-func (ppu *Ppu) showBgInLeftmost() uint {
-	return bits(uint(ppu.ppumask), 1, 1)
+func (ppu *Ppu) showBgInLeftmost() bool {
+	return ppu.ppumask&0x02 != 0
 }
 
-func (ppu *Ppu) showSpriteInLeftmost() uint {
-	return bits(uint(ppu.ppumask), 2, 1)
+func (ppu *Ppu) showSpriteInLeftmost() bool {
+	return ppu.ppumask&0x04 != 0
 }
 
-func (ppu *Ppu) showBg() uint {
-	return bits(uint(ppu.ppumask), 3, 1)
+func (ppu *Ppu) showBg() bool {
+	return ppu.ppumask&0x08 != 0
 }
 
-func (ppu *Ppu) showSprite() uint {
-	return bits(uint(ppu.ppumask), 4, 1)
+func (ppu *Ppu) showSprite() bool {
+	return ppu.ppumask&0x10 != 0
 }
 
-func (ppu *Ppu) emphasizeRed() uint {
-	return bits(uint(ppu.ppumask), 5, 1)
+func (ppu *Ppu) emphasizeRed() bool {
+	return ppu.ppumask&0x20 != 0
 }
 
-func (ppu *Ppu) emphasizeGreen() uint {
-	return bits(uint(ppu.ppumask), 6, 1)
+func (ppu *Ppu) emphasizeGreen() bool {
+	return ppu.ppumask&0x40 != 0
 }
 
-func (ppu *Ppu) emphasizeBlue() uint {
-	return bits(uint(ppu.ppumask), 7, 1)
+func (ppu *Ppu) emphasizeBlue() bool {
+	return ppu.ppumask&0x80 != 0
 }
 
 func (ppu *Ppu) readPpustatus() uint8 {
@@ -167,6 +167,7 @@ func (ppu *Ppu) readPpustatus() uint8 {
 }
 
 func (ppu *Ppu) writePpuscroll(v uint8) {
+	Debug("writePpuscroll: %02Xh\n", v)
 	if ppu.ppuscrollw {
 		ppu.ppuscrollynew = v
 		ppu.ppuscrollw = false
@@ -199,7 +200,7 @@ func (ppu *Ppu) incPpuaddr() {
 }
 
 func (ppu *Ppu) writePpudata(v uint8) {
-	Debug("ppu.ppuaddr=%04X\n", ppu.ppuaddr)
+	Debug("ppu.ppuaddr=%04X data=%02X\n", ppu.ppuaddr, v)
 	ppu.lvram[vramPage(ppu.ppuaddr)][vramOffest(ppu.ppuaddr)] = v
 	ppu.incPpuaddr()
 }
@@ -269,7 +270,7 @@ func getPaletteIndex(attributetable []uint8, x uint, y uint) uint8 {
 }
 
 func getNametableIndex(x uint, y uint) uint {
-	return (x/ScreenSizePixX)%2 + (y/ScreenSizePixY)%2
+	return (x/ScreenSizePixX)%2 + ((y/ScreenSizePixY)%2)*2
 }
 
 func (ppu *Ppu) renderPixel(col uint, row uint) {
@@ -277,29 +278,40 @@ func (ppu *Ppu) renderPixel(col uint, row uint) {
 	const tileSize = 8
 	const hiOffset = 8
 
-	x := col + uint(ppu.ppuscrollx)
-	y := row + uint(ppu.ppuscrolly)
-	nametableIndex := getNametableIndex(x, y)
-	nametable := ppu.nametable[nametableIndex]
+	if ppu.showBg() {
+		x := col + uint(ppu.ppuscrollx)
+		if ppu.ppuctrl&0x01 != 0 {
+			x += 256
+		}
+		y := row + uint(ppu.ppuscrolly)
+		if ppu.ppuctrl&0x02 != 0 {
+			y += 240
+		}
+		nametableIndex := getNametableIndex(x, y)
+		nametable := ppu.nametable[nametableIndex]
 
-	index := getIndexInNametable(x, y)
-	patternIndex := uint16(uint(nametable[index])*patternEntryBytes + y%tileSize)
+		index := getIndexInNametable(x, y)
+		patternIndex := uint16(uint(nametable[index])*patternEntryBytes + y%tileSize)
 
-	lo := ppu.vramRead8(ppu.bgPatternBase() + patternIndex)
-	hi := ppu.vramRead8(ppu.bgPatternBase() + patternIndex + hiOffset)
+		lo := ppu.vramRead8(ppu.bgPatternBase() + patternIndex)
+		hi := ppu.vramRead8(ppu.bgPatternBase() + patternIndex + hiOffset)
 
-	attributetable := ppu.attributetable[nametableIndex]
-	paletteIndex := getPaletteIndex(attributetable, x, y)
+		attributetable := ppu.attributetable[nametableIndex]
+		paletteIndex := getPaletteIndex(attributetable, x, y)
 
-	pix := bits(uint(lo), tileSize-1-x%tileSize, 1) | (bits(uint(hi), tileSize-1-x%tileSize, 1) << 1)
-	if pix == 0 {
-		ppu.screen[row][col] = ppu.bgPalette[0][0]
-	} else {
-		ppu.screen[row][col] = ppu.bgPalette[paletteIndex][pix]
+		pix := bits(uint(lo), tileSize-1-x%tileSize, 1) |
+			(bits(uint(hi), tileSize-1-x%tileSize, 1) << 1)
+		if pix == 0 {
+			ppu.screen[row][col] = ppu.bgPalette[0][0]
+		} else {
+			ppu.screen[row][col] = ppu.bgPalette[paletteIndex][pix]
+		}
 	}
 
-	if ppu.oamScreen[row][col] != 0 {
-		ppu.screen[row][col] = ppu.oamScreen[row][col]
+	if ppu.showSprite() {
+		if ppu.oamScreen[row][col] != 0 {
+			ppu.screen[row][col] = ppu.oamScreen[row][col]
+		}
 	}
 }
 
@@ -320,11 +332,6 @@ func (ppu *Ppu) mapExtMem(address uint16, extmem []uint8, bytes int) {
 	for i := uint16(0); i < uint16(bytes); i += vramPageSize {
 		ppu.lvram[vramPage(address+i)] = extmem[i : i+vramPageSize]
 	}
-	/*
-		for i := uint16(0); i < uint16(bytes); i++ {
-			ppu.vram[address+i] = extmem[i]
-		}
-	*/
 }
 
 func (ppu *Ppu) vramWrite8(address uint16, v uint8) {
@@ -336,6 +343,9 @@ func (ppu *Ppu) vramRead8(address uint16) uint8 {
 }
 
 func (ppu *Ppu) reset() {
+	ppu.ppuscrollx = 0
+	ppu.ppuscrolly = 0
+	ppu.ppuscrollynew = 0
 	ppu.currentScanline = preRenderScanline
 	ppu.clock = 0
 }
@@ -373,7 +383,14 @@ func (sp *Sprite) posX() int {
 }
 
 func (sp *Sprite) posY() int {
-	return int(sp.oam[0])
+	return int(sp.oam[0] + 1)
+}
+
+func (sp *Sprite) visible() bool {
+	if sp.oam[0] >= 0xef && sp.oam[0] <= 0xff {
+		return false
+	}
+	return true
 }
 
 func (sp *Sprite) patternAddress(ppu *Ppu, bottomHalf bool) uint16 {
@@ -437,31 +454,26 @@ func (ppu *Ppu) putSpriteTile(sp *Sprite, x int, y int, bottomHalf bool) {
 
 func (ppu *Ppu) preRenderSprite(spriteIndex int) {
 	sp := ppu.getSprite(spriteIndex)
-	x := sp.posX()
-	y := sp.posY()
-	ppu.putSpriteTile(sp, x, y, false)
-	if !ppu.spriteSize8x8() {
-		ppu.putSpriteTile(sp, x, y+8, true)
+	if sp.visible() {
+		x := sp.posX()
+		y := sp.posY()
+		ppu.putSpriteTile(sp, x, y, false)
+		if !ppu.spriteSize8x8() {
+			ppu.putSpriteTile(sp, x, y+8, true)
+		}
 	}
 }
 
 func (ppu *Ppu) prepSprite() {
-	/*
-		for _, line := range ppu.oamScreen {
-			for i := range line {
-				line[i] = 0
-			}
-		}
-	*/
 	for i := 0; i < ScreenSizePixY; i++ {
 		for j := 0; j < ScreenSizePixX; j++ {
 			ppu.oamScreen[i][j] = 0
 		}
 	}
 
-	for _, line := range ppu.oamMap {
-		for i := range line {
-			line[i] = nullSpIndex
+	for i := 0; i < ScreenSizePixY; i++ {
+		for j := 0; j < ScreenSizePixX; j++ {
+			ppu.oamMap[i][j] = nullSpIndex
 		}
 	}
 
@@ -491,12 +503,12 @@ func (ppu *Ppu) giveCpuClockDelta(cpuclockDelta uint) {
 		}
 
 		if row == preRenderScanline-1 {
-			ppu.updatePpuscrolly()
 			ppu.prepSprite()
 			ppu.ppustatus &= ^PPUSTATUS_V
 		}
 
 		if row == preRenderScanline {
+			ppu.updatePpuscrolly()
 			ppu.currentScanline = 0
 			ppu.clock = 0
 		} else {
@@ -513,6 +525,7 @@ func NewPpu(nes *Nes) *Ppu {
 	// Initialize VRAM
 	//
 	for i := range ppu.lvram {
+		Debug("NewPpu: %04X-%04X\n", vramPageSize*i, vramPageSize*(i+1))
 		ppu.lvram[i] = ppu.vram[vramPageSize*i : vramPageSize*(i+1)]
 	}
 	Debug("VRAM initialized\n")
@@ -527,15 +540,18 @@ func (ppu *Ppu) PostRomLoadSetup() {
 	// Nametable mirror
 	//
 	if rom.fourScreenVram == false {
+		Debug("Name table mirror setitng\n")
 		if rom.verticalMirror {
-			for a := uint16(0x2000); a < 0x2800; a += vramPageSize {
-				ppu.lvram[vramPage(a+0x800)] = ppu.lvram[vramPage(a)]
-				ppu.lvram[vramPage(a+0xc00)] = ppu.lvram[vramPage(a+0x400)]
+			Debug("Vertical mirror setup\n")
+			for i := uint16(0); i < 0x400; i += vramPageSize {
+				ppu.lvram[vramPage(0x2800+i)] = ppu.lvram[vramPage(0x2000+i)]
+				ppu.lvram[vramPage(0x2c00+i)] = ppu.lvram[vramPage(0x2400+i)]
 			}
 		} else {
-			for a := uint16(0x2000); a < 0x2800; a += vramPageSize {
-				ppu.lvram[vramPage(a+0x400)] = ppu.lvram[vramPage(a)]
-				ppu.lvram[vramPage(a+0xc00)] = ppu.lvram[vramPage(a+0x800)]
+			Debug("Horizontal mirror setup\n")
+			for i := uint16(0); i < 0x400; i += vramPageSize {
+				ppu.lvram[vramPage(0x2400+i)] = ppu.lvram[vramPage(0x2000+i)]
+				ppu.lvram[vramPage(0x2c00+i)] = ppu.lvram[vramPage(0x2800+i)]
 			}
 		}
 	}
@@ -546,17 +562,11 @@ func (ppu *Ppu) PostRomLoadSetup() {
 	}
 
 	//
-	// Map Pattern Tables
-	//
-	Debug("Map pattern tables\n")
-	ppu.patternTable[0] = 0
-	ppu.patternTable[1] = 0x1000
-
-	//
 	// Map Name Tables and Attribute Tables
 	//
-	Debug("Map name tables\n")
+	Debug("Name table slices setup\n")
 	if rom.fourScreenVram {
+		Debug("Four screens\n")
 		ppu.nametable[0] = ppu.vram[0x2000:0x23c0]
 		ppu.attributetable[0] = ppu.vram[0x23c0:0x2400]
 		ppu.nametable[1] = ppu.vram[0x2400:0x27c0]
@@ -566,6 +576,7 @@ func (ppu *Ppu) PostRomLoadSetup() {
 		ppu.nametable[3] = ppu.vram[0x2c00:0x2fc0]
 		ppu.attributetable[3] = ppu.vram[0x2fc0:0x3000]
 	} else if rom.verticalMirror {
+		Debug("Vertical mirror\n")
 		ppu.nametable[0] = ppu.vram[0x2000:0x23c0]
 		ppu.attributetable[0] = ppu.vram[0x23c0:0x2400]
 		ppu.nametable[1] = ppu.vram[0x2400:0x27c0]
@@ -575,6 +586,7 @@ func (ppu *Ppu) PostRomLoadSetup() {
 		ppu.nametable[3] = ppu.nametable[1]
 		ppu.attributetable[3] = ppu.attributetable[1]
 	} else {
+		Debug("Horizontal mirror\n")
 		ppu.nametable[0] = ppu.vram[0x2000:0x23c0]
 		ppu.attributetable[0] = ppu.vram[0x23c0:0x2400]
 		ppu.nametable[1] = ppu.nametable[0]

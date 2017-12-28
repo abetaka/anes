@@ -39,7 +39,11 @@ func (m *MainMemory) Read8(address uint16) uint8 {
 	} else if isGamepadAddress(address) {
 		return m.nes.Pad.regRead(address)
 	}
-	return m.mem[page(address)][offset(address)]
+	v := m.mem[page(address)][offset(address)]
+	if address < 0x1000 {
+		Debug("  Rd8: %04X -> %02X\n", address, v)
+	}
+	return v
 }
 
 func (m *MainMemory) isRam(address uint16) bool {
@@ -50,6 +54,9 @@ func (m *MainMemory) isRam(address uint16) bool {
 }
 
 func (m *MainMemory) Write8(address uint16, val uint8) {
+	if address < 0x1000 {
+		Debug("  Wt8: %04X <- %02X\n", address, val)
+	}
 	if m.isRam(address) {
 		m.mem[page(address)][offset(address)] = val
 	} else if isPpuRegAddress(address) {

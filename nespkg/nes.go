@@ -1,9 +1,13 @@
 package nespkg
 
 import (
+	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 )
 
 func bits(v uint, pos uint, width uint) uint {
@@ -18,10 +22,16 @@ type Nes struct {
 	rom     *NesRom
 	mapper  Mapper
 	display Display
+	dbg     *Debugger
 }
 
 type Display interface {
 	Render(screen *[ScreenSizePixY][ScreenSizePixX]uint8)
+}
+
+type Conf struct {
+	DebugEnable bool
+	TraceEnable bool
 }
 
 var DebugEnable bool = false
@@ -40,7 +50,8 @@ func (nes *Nes) Regdump() {
 	nes.cpu.Regdump()
 }
 
-func NewNes(d Display) *Nes {
+func NewNes(conf *Conf, d Display) *Nes {
+	DebugEnable = conf.DebugEnable
 	nes := new(Nes)
 	nes.cpu = NewCpu(nes)
 	nes.ppu = NewPpu(nes)
@@ -48,6 +59,7 @@ func NewNes(d Display) *Nes {
 	nes.cpu.mem = nes.mem
 	nes.display = d
 	nes.Pad = NewGamepad()
+	nes.dbg = NewDebugger(conf, nes)
 	Debug("NewNes: nes=%p\n", nes)
 	return nes
 }
@@ -152,12 +164,301 @@ func (nes *Nes) LoadRom(filename string) error {
 	return nil
 }
 
+func (nes *Nes) Stop() {
+	nes.dbg.step = true
+}
+
 func (nes *Nes) Run() {
 	nes.Reset()
-	//running := true
-	//for i := 0; i < 32; i++ {
-	for true {
+	for {
 		cycle := nes.cpu.executeInst()
 		nes.ppu.giveCpuClockDelta(cycle)
+		nes.dbg.hook()
+	}
+}
+
+type Debugger struct {
+	nes     *Nes
+	ibp     [8]uint16
+	step    bool
+	trace   bool
+	scanner *bufio.Scanner
+	prevCmd DbgCmd
+}
+
+func NewDebugger(conf *Conf, nes *Nes) *Debugger {
+	dbg := new(Debugger)
+	dbg.nes = nes
+	dbg.step = false
+	dbg.trace = conf.TraceEnable
+	dbg.prevCmd = nil
+	for i := range dbg.ibp {
+		dbg.ibp[i] = 0
+	}
+	dbg.scanner = bufio.NewScanner(os.Stdin)
+	return dbg
+}
+
+func (dbg *Debugger) Break() bool {
+	if dbg.step {
+		dbg.step = false
+		return true
+	}
+
+	for _, ibp := range dbg.ibp {
+		if ibp == dbg.nes.cpu.pc {
+			return true
+		}
+	}
+
+	return false
+}
+
+type DbgCmdTableEntry struct {
+	cmdMaker func([]string) (DbgCmd, error)
+}
+
+type DbgCmd interface {
+	execCmd(dbg *Debugger) bool
+}
+
+var DbgCmdTable = map[string]DbgCmdTableEntry{
+	"a":   {NewDbgCmdAsm},
+	"s":   {func(args []string) (DbgCmd, error) { return new(DbgCmdStep), nil }},
+	"c":   {func(args []string) (DbgCmd, error) { return new(DbgCmdCont), nil }},
+	"t":   {func(args []string) (DbgCmd, error) { return new(DbgCmdTrace), nil }},
+	"p":   {func(args []string) (DbgCmd, error) { return new(DbgCmdPpureg), nil }},
+	"m":   {NewDbgCmdMem},
+	"v":   {NewDbgCmdVramRead},
+	"r":   {func(args []string) (DbgCmd, error) { return new(DbgCmdRep), nil }},
+	"":    {func(args []string) (DbgCmd, error) { return new(DbgCmdRep), nil }},
+	"nop": {func(args []string) (DbgCmd, error) { return new(DbgCmdNop), nil }},
+}
+
+type DbgCmdBase struct {
+	args []string
+}
+
+func (cmd *DbgCmdBase) execCmd(dbg *Debugger) bool {
+	return true
+}
+
+type DbgCmdStep struct {
+	DbgCmdBase
+}
+
+func (cmd *DbgCmdStep) execCmd(dbg *Debugger) bool {
+	dbg.step = true
+	return false
+}
+
+type DbgCmdPpureg struct {
+	DbgCmdBase
+}
+
+func (cmd *DbgCmdPpureg) execCmd(dbg *Debugger) bool {
+	ppu := dbg.nes.ppu
+	fmt.Printf("ppuctrl        = %02Xh\n", ppu.ppuctrl)
+	fmt.Printf("ppumask        = %02Xh\n", ppu.ppumask)
+	fmt.Printf("ppustatus      = %02Xh\n", ppu.ppustatus)
+	fmt.Printf("ppuscrollx     = %02Xh\n", ppu.ppuscrollx)
+	fmt.Printf("ppuscrolly     = %02Xh\n", ppu.ppuscrolly)
+	fmt.Printf("ppuscrollynew  = %02Xh\n", ppu.ppuscrollynew)
+	fmt.Printf("ppuscrollw     = %t\n", ppu.ppuscrollw)
+	fmt.Printf("ppuaddr        = %02Xh\n", ppu.ppuaddr)
+	fmt.Printf("ppuaddrw       = %t\n", ppu.ppuaddrw)
+	fmt.Printf("ppudata        = %02Xh\n", ppu.ppudata)
+	return true
+}
+
+type DbgCmdRep struct {
+	DbgCmdBase
+}
+
+func (cmd *DbgCmdRep) execCmd(dbg *Debugger) bool {
+	if dbg.prevCmd != nil {
+		return dbg.prevCmd.execCmd(dbg)
+	} else {
+		return false
+	}
+}
+
+type DbgCmdCont struct {
+	DbgCmdBase
+}
+
+func (cmd *DbgCmdCont) execCmd(dbg *Debugger) bool {
+	dbg.step = false
+	return false
+}
+
+type DbgCmdNop struct {
+	DbgCmdBase
+}
+
+func (cmd *DbgCmdNop) execCmd(dbg *Debugger) bool {
+	return true
+}
+
+type DbgCmdTrace struct {
+	DbgCmdBase
+}
+
+func (cmd *DbgCmdTrace) execCmd(dbg *Debugger) bool {
+	if dbg.trace {
+		dbg.trace = false
+	} else {
+		dbg.trace = true
+	}
+	fmt.Printf("trace = %t\n", dbg.trace)
+	return true
+}
+
+type DbgCmdMem struct {
+	DbgCmdBase
+	address uint16
+	length  int
+}
+
+func NewDbgCmdMem(args []string) (DbgCmd, error) {
+	if len(args) != 2 {
+		return nil, errors.New("mem: invalid arguments")
+	}
+	c := new(DbgCmdMem)
+	if a, err := strconv.ParseUint(args[0], 16, 16); err == nil {
+		c.address = uint16(a)
+	} else {
+		return nil, errors.New("mem: invalid arguments")
+	}
+	if l, err := strconv.ParseInt(args[1], 16, 0); err == nil {
+		c.length = int(l)
+	} else {
+		return nil, errors.New("mem: invalid arguments")
+	}
+	return c, nil
+}
+
+type DbgCmdVramRead struct {
+	DbgCmdBase
+	address uint16
+	length  int
+}
+
+func NewDbgCmdVramRead(args []string) (DbgCmd, error) {
+	if len(args) != 2 {
+		return nil, errors.New("vramread: invalid arguments")
+	}
+	c := new(DbgCmdVramRead)
+	if a, err := strconv.ParseUint(args[0], 16, 16); err == nil {
+		c.address = uint16(a)
+	} else {
+		return nil, errors.New("vramread: invalid arguments")
+	}
+	if l, err := strconv.ParseInt(args[1], 16, 0); err == nil {
+		c.length = int(l)
+	} else {
+		return nil, errors.New("vramread: invalid arguments")
+	}
+	return c, nil
+}
+
+func (cmd *DbgCmdVramRead) execCmd(dbg *Debugger) bool {
+	r := func(a uint16) uint8 { return dbg.nes.ppu.vramRead8(a) }
+	dumpMem(r, cmd.address, cmd.length)
+	return true
+}
+
+type DbgCmdAsm struct {
+	DbgCmdBase
+	address uint16
+	length  int
+}
+
+func NewDbgCmdAsm(args []string) (DbgCmd, error) {
+	if len(args) != 2 {
+		return nil, errors.New("invalid arguments")
+	}
+	c := new(DbgCmdAsm)
+	if a, err := strconv.ParseUint(args[0], 16, 16); err == nil {
+		c.address = uint16(a)
+	} else {
+		return nil, errors.New("invalid arguments")
+	}
+	if l, err := strconv.ParseInt(args[1], 16, 0); err == nil {
+		c.length = int(l)
+	} else {
+		return nil, errors.New("invalid arguments")
+	}
+	return c, nil
+}
+
+func (cmd *DbgCmdAsm) execCmd(dbg *Debugger) bool {
+	for pc := cmd.address; pc < cmd.address+uint16(cmd.length); {
+		err, b, s := GetAsmStr(dbg.nes.mem, pc)
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+		fmt.Println(s)
+		pc += uint16(b)
+	}
+	return true
+}
+
+func dumpMem(r func(uint16) uint8, start uint16, length int) {
+	fmt.Println("      00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f")
+	fmt.Println("-----------------------------------------------------------------------------------------------------")
+	for i := 0; i < length; i++ {
+		address := start + uint16(i)
+		if i%32 == 0 {
+			fmt.Printf("%04X:", address)
+		}
+		fmt.Printf(" %02X", r(address))
+		if i%32 == 31 {
+			fmt.Println("")
+		}
+	}
+	fmt.Println("")
+}
+
+func (cmd *DbgCmdMem) execCmd(dbg *Debugger) bool {
+	r := func(a uint16) uint8 { return dbg.nes.cpu.mem.Read8(a) }
+	dumpMem(r, cmd.address, cmd.length)
+	return true
+}
+
+func (dbg *Debugger) NewCmd() (DbgCmd, error) {
+	t := []string{"nop"}
+	if dbg.scanner.Scan() {
+		t = strings.Split(dbg.scanner.Text(), " ")
+	}
+	e, ok := DbgCmdTable[t[0]]
+	if ok {
+		return e.cmdMaker(t[1:])
+
+	} else {
+		return nil, errors.New("Invalid command")
+	}
+}
+
+func (dbg *Debugger) hook() {
+	if !dbg.Break() {
+		return
+	}
+
+	inDebug := true
+	for inDebug {
+		fmt.Print("dbg> ")
+		cmd, err := dbg.NewCmd()
+		if err == nil {
+			inDebug = cmd.execCmd(dbg)
+			switch cmd.(type) {
+			case *DbgCmdRep:
+			default:
+				dbg.prevCmd = cmd
+			}
+		} else {
+			fmt.Println(err)
+		}
 	}
 }

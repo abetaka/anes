@@ -115,25 +115,28 @@ func (mcw *MyCustomWidget) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uin
 			mcw.myGoRoutineCreated = true
 			nespkg.Debug("goroutine created\n")
 		}
-	case win.WM_KEYDOWN:
-		nespkg.Debug("KeyDown\n")
-	case win.WM_KEYUP:
-		nespkg.Debug("KeyUp\n")
+	case win.WM_RBUTTONDOWN:
+		nespkg.Debug("Stop CPU\n")
+		mcw.nes.Stop()
 	}
 	return mcw.CustomWidget.WndProc(hwnd, msg, wParam, lParam)
 }
 
 func makeKeyDownHandler(pad *nespkg.Gamepad) func(key walk.Key) {
 	return func(key walk.Key) {
-		nespkg.Debug("KeyDown: %d\n", key)
-		pad.SetButtonState(gamepadButtonMap[key], true)
+		button, ok := gamepadButtonMap[key]
+		if ok {
+			pad.SetButtonState(button, true)
+		}
 	}
 }
 
 func makeKeyUpHandler(pad *nespkg.Gamepad) func(key walk.Key) {
 	return func(key walk.Key) {
-		nespkg.Debug("KeyUp: %d\n", key)
-		pad.SetButtonState(gamepadButtonMap[key], false)
+		button, ok := gamepadButtonMap[key]
+		if ok {
+			pad.SetButtonState(button, false)
+		}
 	}
 }
 
@@ -201,13 +204,20 @@ func runMyWidget(display *NesDisplay, nes *nespkg.Nes) {
 	mw.Run()
 }
 
-func main() {
-	flag.BoolVar(&nespkg.DebugEnable, "d", false, "Enable debug mode")
+func MakeConf() *nespkg.Conf {
+	conf := new(nespkg.Conf)
+	flag.BoolVar(&conf.DebugEnable, "d", false, "Enable debug mode")
+	flag.BoolVar(&conf.TraceEnable, "t", false, "Enable instruction trace")
 	flag.Parse()
-	fmt.Println("debug: ", nespkg.DebugEnable)
+	fmt.Println("debug: ", conf.DebugEnable)
+	fmt.Println("trace on: ", conf.TraceEnable)
+	return conf
+}
 
+func main() {
+	conf := MakeConf()
 	display := NewNesDisplay()
-	nes := nespkg.NewNes(display)
+	nes := nespkg.NewNes(conf, display)
 	if len(flag.Args()) >= 1 {
 		nespkg.Debug("loading: %s\n", flag.Arg(0))
 		err := nes.LoadRom(flag.Arg(0))
