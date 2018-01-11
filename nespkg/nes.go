@@ -30,11 +30,13 @@ type Display interface {
 }
 
 type Conf struct {
-	DebugEnable bool
-	TraceEnable bool
+	DebugEnable    bool
+	TraceEnable    bool
+	MemTraceEnable bool
 }
 
 var DebugEnable bool = false
+var MemTraceEnable bool = false
 
 func Debug(f string, a ...interface{}) {
 	if DebugEnable {
@@ -52,6 +54,7 @@ func (nes *Nes) Regdump() {
 
 func NewNes(conf *Conf, d Display) *Nes {
 	DebugEnable = conf.DebugEnable
+	MemTraceEnable = conf.MemTraceEnable
 	nes := new(Nes)
 	nes.cpu = NewCpu(nes)
 	nes.ppu = NewPpu(nes)

@@ -402,9 +402,13 @@ type Cpu struct {
 
 type Memory interface {
 	Read8(uint16) uint8
+	Read8NoTrace(uint16) uint8
 	Read16(uint16) uint16
+	Read16NoTrace(uint16) uint16
 	Write8(uint16, uint8)
+	Write8NoTrace(uint16, uint8)
 	Write16(uint16, uint16)
+	Write16NoTrace(uint16, uint16)
 }
 
 func (c *Cpu) Reset() {
@@ -435,7 +439,7 @@ func (cpu *Cpu) push8(v uint8) {
 
 func (cpu *Cpu) pop8() uint8 {
 	cpu.s++
-	return cpu.mem.Read8(stackBase + uint16(cpu.s))
+	return cpu.mem.Read8NoTrace(stackBase + uint16(cpu.s))
 }
 
 func (cpu *Cpu) push16(v uint16) {
@@ -462,11 +466,11 @@ func get_opdstr_acc(mem Memory, pc uint16) string {
 }
 
 func get_value_imm(cpu *Cpu) uint8 {
-	return cpu.mem.Read8(cpu.pc + 1)
+	return cpu.mem.Read8NoTrace(cpu.pc + 1)
 }
 
 func get_opdstr_imm(mem Memory, pc uint16) string {
-	return fmt.Sprintf("#$%02X", mem.Read8(pc+1))
+	return fmt.Sprintf("#$%02X", mem.Read8NoTrace(pc+1))
 }
 
 func get_opdstr_imp(mem Memory, pc uint16) string {
@@ -486,7 +490,7 @@ func set_value_zrp(cpu *Cpu, v uint8) {
 }
 
 func get_opdstr_zrp(mem Memory, pc uint16) string {
-	return fmt.Sprintf("$%02X", mem.Read8(pc+1))
+	return fmt.Sprintf("$%02X", mem.Read8NoTrace(pc+1))
 }
 
 func get_addr_zpx(cpu *Cpu) uint16 {
@@ -502,7 +506,7 @@ func set_value_zpx(cpu *Cpu, v uint8) {
 }
 
 func get_opdstr_zpx(mem Memory, pc uint16) string {
-	return fmt.Sprintf("$%02X,X", mem.Read8(pc+1))
+	return fmt.Sprintf("$%02X,X", mem.Read8NoTrace(pc+1))
 }
 
 func get_addr_zpy(cpu *Cpu) uint16 {
@@ -510,7 +514,7 @@ func get_addr_zpy(cpu *Cpu) uint16 {
 }
 
 func get_value_zpy(cpu *Cpu) uint8 {
-	return cpu.mem.Read8(get_addr_zpy(cpu))
+	return cpu.mem.Read8NoTrace(get_addr_zpy(cpu))
 }
 
 func set_value_zpy(cpu *Cpu, v uint8) {
@@ -518,26 +522,26 @@ func set_value_zpy(cpu *Cpu, v uint8) {
 }
 
 func get_opdstr_zpy(mem Memory, pc uint16) string {
-	return fmt.Sprintf("$%02X,Y", mem.Read8(pc+1))
+	return fmt.Sprintf("$%02X,Y", mem.Read8NoTrace(pc+1))
 }
 
 func get_addr_ind(cpu *Cpu) uint16 {
-	a := cpu.mem.Read16(cpu.pc + 1)
-	lo := cpu.mem.Read8(a)
-	hi := cpu.mem.Read8(a&0xff00 | uint16(uint8(a&0x0ff)+1))
+	a := cpu.mem.Read16NoTrace(cpu.pc + 1)
+	lo := cpu.mem.Read8NoTrace(a)
+	hi := cpu.mem.Read8NoTrace(a&0xff00 | uint16(uint8(a&0x0ff)+1))
 	return uint16(hi)<<8 | uint16(lo)
 }
 
 func get_opdstr_ind(mem Memory, pc uint16) string {
-	return fmt.Sprintf("($%04X)", mem.Read16(pc+1))
+	return fmt.Sprintf("($%04X)", mem.Read16NoTrace(pc+1))
 }
 
 func get_addr_abs(cpu *Cpu) uint16 {
-	return cpu.mem.Read16(cpu.pc + 1)
+	return cpu.mem.Read16NoTrace(cpu.pc + 1)
 }
 
 func get_value_abs(cpu *Cpu) uint8 {
-	return cpu.mem.Read8(get_addr_abs(cpu))
+	return cpu.mem.Read8NoTrace(get_addr_abs(cpu))
 }
 
 func set_value_abs(cpu *Cpu, v uint8) {
@@ -545,11 +549,11 @@ func set_value_abs(cpu *Cpu, v uint8) {
 }
 
 func get_opdstr_abs(mem Memory, pc uint16) string {
-	return fmt.Sprintf("$%04X", mem.Read16(pc+1))
+	return fmt.Sprintf("$%04X", mem.Read16NoTrace(pc+1))
 }
 
 func get_addr_abx(cpu *Cpu) uint16 {
-	return cpu.mem.Read16(cpu.pc+1) + uint16(cpu.x)
+	return cpu.mem.Read16NoTrace(cpu.pc+1) + uint16(cpu.x)
 }
 
 func get_value_abx(cpu *Cpu) uint8 {
@@ -561,11 +565,11 @@ func set_value_abx(cpu *Cpu, v uint8) {
 }
 
 func get_opdstr_abx(mem Memory, pc uint16) string {
-	return fmt.Sprintf("$%04X,x", mem.Read16(pc+1))
+	return fmt.Sprintf("$%04X,x", mem.Read16NoTrace(pc+1))
 }
 
 func get_addr_aby(cpu *Cpu) uint16 {
-	return cpu.mem.Read16(cpu.pc+1) + uint16(cpu.y)
+	return cpu.mem.Read16NoTrace(cpu.pc+1) + uint16(cpu.y)
 }
 
 func get_value_aby(cpu *Cpu) uint8 {
@@ -577,13 +581,13 @@ func set_value_aby(cpu *Cpu, v uint8) {
 }
 
 func get_opdstr_aby(mem Memory, pc uint16) string {
-	return fmt.Sprintf("$%04X,y", mem.Read16(pc+1))
+	return fmt.Sprintf("$%04X,y", mem.Read16NoTrace(pc+1))
 }
 
 func get_addr_inx(cpu *Cpu) uint16 {
 	a := get_value_imm(cpu) + cpu.x
-	u := uint16(cpu.mem.Read8(uint16(a)))
-	u |= uint16(cpu.mem.Read8(uint16(a+1))) << 8
+	u := uint16(cpu.mem.Read8NoTrace(uint16(a)))
+	u |= uint16(cpu.mem.Read8NoTrace(uint16(a+1))) << 8
 	return u
 }
 
@@ -596,13 +600,13 @@ func set_value_inx(cpu *Cpu, v uint8) {
 }
 
 func get_opdstr_inx(mem Memory, pc uint16) string {
-	return fmt.Sprintf("($%02X,X)", mem.Read8(pc+1))
+	return fmt.Sprintf("($%02X,X)", mem.Read8NoTrace(pc+1))
 }
 
 func get_addr_iny(cpu *Cpu) uint16 {
 	a := get_value_imm(cpu)
-	lo := cpu.mem.Read8(uint16(a))
-	hi := cpu.mem.Read8(uint16(a + 1))
+	lo := cpu.mem.Read8NoTrace(uint16(a))
+	hi := cpu.mem.Read8NoTrace(uint16(a + 1))
 	return (uint16(hi)<<8 | uint16(lo)) + uint16(cpu.y)
 }
 
@@ -615,11 +619,11 @@ func set_value_iny(cpu *Cpu, v uint8) {
 }
 
 func get_opdstr_iny(mem Memory, pc uint16) string {
-	return fmt.Sprintf("($%02X,Y)", mem.Read8(pc+1))
+	return fmt.Sprintf("($%02X,Y)", mem.Read8NoTrace(pc+1))
 }
 
 func get_opdstr_rel(mem Memory, pc uint16) string {
-	d := uint16(int(pc+2) + int(int8(mem.Read8(pc+1))))
+	d := uint16(int(pc+2) + int(int8(mem.Read8NoTrace(pc+1))))
 	return fmt.Sprintf("$%04X", d)
 }
 
@@ -900,6 +904,10 @@ func exec_rol(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	if oldCarry != 0 {
 		v |= 0x01
 	}
+	cpu.p &= ^P_C
+	if u&0x80 != 0 {
+		cpu.p |= P_C
+	}
 	cpu.p &= ^P_N
 	if v&0x80 != 0 {
 		cpu.p |= P_N
@@ -1097,7 +1105,7 @@ func (cpu *Cpu) executeInst() uint {
 		cpu.pc = cpu.mem.Read16(VEC_NMI)
 	}
 
-	opc := cpu.mem.Read8(cpu.pc)
+	opc := cpu.mem.Read8NoTrace(cpu.pc)
 	mode := instTable[opc].mode
 	bytes := instTable[opc].bytes
 	if cpu.nes.dbg.trace {
@@ -1112,7 +1120,7 @@ func (cpu *Cpu) executeInst() uint {
 }
 
 func GetAsmStr(mem Memory, pc uint16) (error, int, string) {
-	opc := mem.Read8(pc)
+	opc := mem.Read8NoTrace(pc)
 	_, ok := instTable[opc]
 	if !ok {
 		return errors.New("invalid opcode"), 0, "invalid opcode"

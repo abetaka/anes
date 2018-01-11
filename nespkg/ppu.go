@@ -17,6 +17,7 @@ type Ppustatus struct {
 }
 
 const PPUSTATUS_V = uint8(0x80)
+const PPUSTATUS_S = uint8(0x40)
 
 type Ppu struct {
 	ppuctrl         uint8
@@ -313,6 +314,13 @@ func (ppu *Ppu) renderPixel(col uint, row uint) {
 			ppu.screen[row][col] = ppu.oamScreen[row][col]
 		}
 	}
+
+	if ppu.ppustatus&PPUSTATUS_S == 0 && ppu.showSprite() && ppu.showBg() {
+		if ppu.oamMap[row][col] == 0 && ppu.screen[row][col] != 0 {
+			Debug("Sprite zero hit\n")
+			ppu.ppustatus |= PPUSTATUS_S
+		}
+	}
 }
 
 func vramPage(a uint16) uint {
@@ -444,9 +452,11 @@ func (ppu *Ppu) putSpriteTile(sp *Sprite, x int, y int, bottomHalf bool) {
 				c = ppu.spPalette[sp.paletteIndex()][pix]
 			}
 
-			ppu.oamScreen[(y+j)%ScreenSizePixY][(x+i)%ScreenSizePixX] = c
+			u := (x + i) % ScreenSizePixX
+			v := (y + j) % ScreenSizePixY
+			ppu.oamScreen[v][u] = c
 			if c != 0 {
-				ppu.oamMap[(y+j)%ScreenSizePixY][(x+i)%ScreenSizePixX] = uint8(sp.index)
+				ppu.oamMap[v][u] = uint8(sp.index)
 			}
 		}
 	}
@@ -477,7 +487,7 @@ func (ppu *Ppu) prepSprite() {
 		}
 	}
 
-	for i := 0; i < 64; i++ {
+	for i := 63; i >= 0; i-- {
 		ppu.preRenderSprite(i)
 	}
 }
@@ -503,8 +513,8 @@ func (ppu *Ppu) giveCpuClockDelta(cpuclockDelta uint) {
 		}
 
 		if row == preRenderScanline-1 {
+			ppu.ppustatus &= ^(PPUSTATUS_V | PPUSTATUS_S)
 			ppu.prepSprite()
-			ppu.ppustatus &= ^PPUSTATUS_V
 		}
 
 		if row == preRenderScanline {

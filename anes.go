@@ -204,18 +204,20 @@ func runMyWidget(display *NesDisplay, nes *nespkg.Nes) {
 	mw.Run()
 }
 
-func MakeConf() *nespkg.Conf {
+func NewConf() *nespkg.Conf {
 	conf := new(nespkg.Conf)
 	flag.BoolVar(&conf.DebugEnable, "d", false, "Enable debug mode")
 	flag.BoolVar(&conf.TraceEnable, "t", false, "Enable instruction trace")
+	flag.BoolVar(&conf.MemTraceEnable, "m", false, "Enable memory trace")
 	flag.Parse()
 	fmt.Println("debug: ", conf.DebugEnable)
-	fmt.Println("trace on: ", conf.TraceEnable)
+	fmt.Println("instruction trace on: ", conf.TraceEnable)
+	fmt.Println("memory trace on: ", conf.MemTraceEnable)
 	return conf
 }
 
 func main() {
-	conf := MakeConf()
+	conf := NewConf()
 	display := NewNesDisplay()
 	nes := nespkg.NewNes(conf, display)
 	if len(flag.Args()) >= 1 {

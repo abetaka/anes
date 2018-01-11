@@ -34,16 +34,20 @@ func offset(address uint16) uint {
 }
 
 func (m *MainMemory) Read8(address uint16) uint8 {
+	v := m.Read8NoTrace(address)
+	if MemTraceEnable {
+		Debug("  Rd8: %04X -> %02X\n", address, v)
+	}
+	return v
+}
+
+func (m *MainMemory) Read8NoTrace(address uint16) uint8 {
 	if isPpuRegAddress(address) {
 		return m.nes.ppu.readMmapReg(address)
 	} else if isGamepadAddress(address) {
 		return m.nes.Pad.regRead(address)
 	}
-	v := m.mem[page(address)][offset(address)]
-	if address < 0x1000 {
-		Debug("  Rd8: %04X -> %02X\n", address, v)
-	}
-	return v
+	return m.mem[page(address)][offset(address)]
 }
 
 func (m *MainMemory) isRam(address uint16) bool {
@@ -54,9 +58,13 @@ func (m *MainMemory) isRam(address uint16) bool {
 }
 
 func (m *MainMemory) Write8(address uint16, val uint8) {
-	if address < 0x1000 {
+	if MemTraceEnable {
 		Debug("  Wt8: %04X <- %02X\n", address, val)
 	}
+	m.Write8NoTrace(address, val)
+}
+
+func (m *MainMemory) Write8NoTrace(address uint16, val uint8) {
 	if m.isRam(address) {
 		m.mem[page(address)][offset(address)] = val
 	} else if isPpuRegAddress(address) {
@@ -72,9 +80,18 @@ func (m *MainMemory) Read16(address uint16) uint16 {
 	return uint16(m.Read8(address)) | uint16(m.Read8(address+1))<<8
 }
 
+func (m *MainMemory) Read16NoTrace(address uint16) uint16 {
+	return uint16(m.Read8NoTrace(address)) | uint16(m.Read8NoTrace(address+1))<<8
+}
+
 func (m *MainMemory) Write16(address uint16, v uint16) {
 	m.Write8(address, uint8(v&0x0ff))
 	m.Write8(address+1, uint8(v>>8))
+}
+
+func (m *MainMemory) Write16NoTrace(address uint16, v uint16) {
+	m.Write8NoTrace(address, uint8(v&0x0ff))
+	m.Write8NoTrace(address+1, uint8(v>>8))
 }
 
 func (m *MainMemory) setNrom128Mirror() {
