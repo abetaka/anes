@@ -945,10 +945,11 @@ func exec_ror(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 func exec_sbc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	a_prev := cpu.a
 	m := modeOpsTable[mode].getValue(cpu)
-	cpu.a = cpu.a - m - (1 - cpu.p&P_C)
+	v := m + (1 - cpu.p&P_C)
+	cpu.a = cpu.a - v
 	u := int(int8(a_prev)) - int(int8(m)) - int(1-cpu.p&P_C)
 	cpu.p &= ^(P_C | P_V)
-	if a_prev >= m {
+	if a_prev >= v {
 		cpu.p |= P_C
 	}
 	if u < -128 || u > 127 {

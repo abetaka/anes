@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func bits(v uint, pos uint, width uint) uint {
@@ -159,7 +160,11 @@ func (nes *Nes) LoadRom(filename string) error {
 	Debug("ROM header analyzed\n")
 	rom.PrintRomData()
 	nes.rom = rom
-	nes.mapper = MakeMapper(nes, rom.mapperNum)
+	var err3 error
+	nes.mapper, err3 = MakeMapper(nes, rom.mapperNum)
+	if err3 != nil {
+		return err3
+	}
 	nes.mapper.Init()
 	Debug("calling PostRomLoadSetup\n")
 	nes.ppu.PostRomLoadSetup()
@@ -171,11 +176,18 @@ func (nes *Nes) Stop() {
 	nes.dbg.step = true
 }
 
+const framePeriodMicroSeconds = time.Microsecond * 16666
+
 func (nes *Nes) Run() {
 	nes.Reset()
+	lastVblTime := time.Now()
 	for {
 		cycle := nes.cpu.executeInst()
-		nes.ppu.giveCpuClockDelta(cycle)
+		if nes.ppu.giveCpuClockDelta(cycle) {
+			t := time.Since(lastVblTime)
+			time.Sleep(framePeriodMicroSeconds - t)
+			lastVblTime = time.Now()
+		}
 		nes.dbg.hook()
 	}
 }
@@ -230,6 +242,7 @@ var DbgCmdTable = map[string]DbgCmdTableEntry{
 	"s":   {func(args []string) (DbgCmd, error) { return new(DbgCmdStep), nil }},
 	"c":   {func(args []string) (DbgCmd, error) { return new(DbgCmdCont), nil }},
 	"t":   {func(args []string) (DbgCmd, error) { return new(DbgCmdTrace), nil }},
+	"mt":  {func(args []string) (DbgCmd, error) { return new(DbgCmdMemoryTrace), nil }},
 	"p":   {func(args []string) (DbgCmd, error) { return new(DbgCmdPpureg), nil }},
 	"m":   {NewDbgCmdMem},
 	"v":   {NewDbgCmdVramRead},
@@ -314,6 +327,20 @@ func (cmd *DbgCmdTrace) execCmd(dbg *Debugger) bool {
 		dbg.trace = true
 	}
 	fmt.Printf("trace = %t\n", dbg.trace)
+	return true
+}
+
+type DbgCmdMemoryTrace struct {
+	DbgCmdBase
+}
+
+func (cmd *DbgCmdMemoryTrace) execCmd(dbg *Debugger) bool {
+	if MemTraceEnable {
+		MemTraceEnable = false
+	} else {
+		MemTraceEnable = true
+	}
+	fmt.Printf("memory trace = %t\n", MemTraceEnable)
 	return true
 }
 

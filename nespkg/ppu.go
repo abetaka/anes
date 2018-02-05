@@ -492,7 +492,8 @@ func (ppu *Ppu) prepSprite() {
 	}
 }
 
-func (ppu *Ppu) giveCpuClockDelta(cpuclockDelta uint) {
+func (ppu *Ppu) giveCpuClockDelta(cpuclockDelta uint) bool {
+	lvs := false
 	ppu.clock += toPpuClockDelta(cpuclockDelta)
 	for row := ppu.currentScanline; ppu.clock >= scanlineToClock(row); row++ {
 		if row >= firstVisibleScanline && row <= lastVisibleScanline {
@@ -510,6 +511,7 @@ func (ppu *Ppu) giveCpuClockDelta(cpuclockDelta uint) {
 		if row == lastVisibleScanline {
 			Debug("lastVisibleScanline\n")
 			ppu.nes.display.Render(&ppu.screen)
+			lvs = true
 		}
 
 		if row == preRenderScanline-1 {
@@ -525,6 +527,7 @@ func (ppu *Ppu) giveCpuClockDelta(cpuclockDelta uint) {
 			ppu.currentScanline++
 		}
 	}
+	return lvs
 }
 
 func NewPpu(nes *Nes) *Ppu {

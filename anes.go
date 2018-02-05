@@ -224,7 +224,7 @@ func main() {
 		nespkg.Debug("loading: %s\n", flag.Arg(0))
 		err := nes.LoadRom(flag.Arg(0))
 		if err != nil {
-			fmt.Println("ROM format error")
+			fmt.Println(err)
 			return
 		}
 	} else {
