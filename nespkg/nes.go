@@ -11,6 +11,45 @@ import (
 	"time"
 )
 
+type Gamepad interface {
+	regWrite(val uint8)
+	regRead() uint8
+}
+
+const (
+	ButtonA = iota
+	ButtonB
+	ButtonSelect
+	ButtonStart
+	ButtonUp
+	ButtonDown
+	ButtonLeft
+	ButtonRight
+	ButtonMax
+)
+
+type GamepadButton int
+
+type KbdReader struct {
+	buttonPressed [ButtonMax]bool
+}
+
+func (r *KbdReader) KeyUpCallback(button GamepadButton) {
+	r.buttonPressed[button] = false
+}
+
+func (r *KbdReader) KeyDownCallback(button GamepadButton) {
+	r.buttonPressed[button] = true
+}
+
+func NewKbdReader() *KbdReader {
+	r := new(KbdReader)
+	for i := range r.buttonPressed {
+		r.buttonPressed[i] = false
+	}
+	return r
+}
+
 func bits(v uint, pos uint, width uint) uint {
 	return (v >> pos) & ((1 << width) - 1)
 }
@@ -18,7 +57,8 @@ func bits(v uint, pos uint, width uint) uint {
 type Nes struct {
 	cpu     *Cpu
 	ppu     *Ppu
-	Pad     *Gamepad
+	Pad     [2]Gamepad
+	Kbd     *KbdReader
 	mem     *MainMemory
 	rom     *NesRom
 	mapper  Mapper
@@ -60,9 +100,13 @@ func NewNes(conf *Conf, d Display) *Nes {
 	nes.cpu = NewCpu(nes)
 	nes.ppu = NewPpu(nes)
 	nes.mem = NewMainMemory(nes)
+	nes.Kbd = NewKbdReader()
 	nes.cpu.mem = nes.mem
 	nes.display = d
-	nes.Pad = NewGamepad()
+	nes.Pad[0] = NewUsbGamepad(0)
+	if nes.Pad[0] == nil {
+		nes.Pad[0] = NewKbdGamepad(nes.Kbd)
+	}
 	nes.dbg = NewDebugger(conf, nes)
 	Debug("NewNes: nes=%p\n", nes)
 	return nes
@@ -180,13 +224,13 @@ const framePeriodMicroSeconds = time.Microsecond * 16666
 
 func (nes *Nes) Run() {
 	nes.Reset()
-	lastVblTime := time.Now()
+	lastRefreshTime := time.Now()
 	for {
 		cycle := nes.cpu.executeInst()
 		if nes.ppu.giveCpuClockDelta(cycle) {
-			t := time.Since(lastVblTime)
+			t := time.Since(lastRefreshTime)
 			time.Sleep(framePeriodMicroSeconds - t)
-			lastVblTime = time.Now()
+			lastRefreshTime = time.Now()
 		}
 		nes.dbg.hook()
 	}

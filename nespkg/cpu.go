@@ -63,19 +63,19 @@ type ModeOps struct {
 }
 
 var modeOpsTable = map[InstMode]ModeOps{
-	abs: {get_addr_abs, get_value_abs, set_value_abs, get_opdstr_abs},
-	abx: {get_addr_abx, get_value_abx, set_value_abx, get_opdstr_abx},
-	aby: {get_addr_aby, get_value_aby, set_value_aby, get_opdstr_aby},
-	acc: {nil, get_value_acc, set_value_acc, get_opdstr_acc},
-	imm: {nil, get_value_imm, nil, get_opdstr_imm},
-	imp: {nil, nil, nil, get_opdstr_imp},
-	ind: {get_addr_ind, nil, nil, get_opdstr_ind},
-	inx: {get_addr_inx, get_value_inx, set_value_inx, get_opdstr_inx},
-	iny: {get_addr_iny, get_value_iny, set_value_iny, get_opdstr_iny},
-	rel: {nil, get_value_imm, nil, get_opdstr_rel},
-	zrp: {get_addr_zrp, get_value_zrp, set_value_zrp, get_opdstr_zrp},
-	zpx: {get_addr_zpx, get_value_zpx, set_value_zpx, get_opdstr_zpx},
-	zpy: {get_addr_zpy, get_value_zpy, set_value_zpy, get_opdstr_zpy},
+	abs: {getAddrAbs, getValueAbs, setValueAbs, getOpdstrAbs},
+	abx: {getAddrAbx, getValueAbx, setValueAbx, getOpdstrAbx},
+	aby: {getAddrAby, getValueAby, setValueAby, getOpdstrAby},
+	acc: {nil, getValueAcc, setValueAcc, getOpdstrAcc},
+	imm: {nil, getValueImm, nil, getOpdstrImm},
+	imp: {nil, nil, nil, getOpdstrImp},
+	ind: {getAddrInd, nil, nil, getOpdstrInd},
+	inx: {getAddrInx, getValueInx, setValueInx, getOpdstrInx},
+	iny: {getAddrIny, getValueIny, setValueIny, getOpdstrIny},
+	rel: {nil, getValueImm, nil, getOpdstrRel},
+	zrp: {getAddrZrp, getValueZrp, setValueZrp, getOpdstrZrp},
+	zpx: {getAddrZpx, getValueZpx, setValueZpx, getOpdstrZpx},
+	zpy: {getAddrZpy, getValueZpy, setValueZpy, getOpdstrZpy},
 }
 
 var instTable = map[uint8]InstParams{
@@ -235,157 +235,157 @@ var instTable = map[uint8]InstParams{
 type InstHandler func(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint
 
 var instHandlerTable = map[uint8]InstHandler{
-	0x00: exec_brk,
-	0x01: exec_ora,
-	0x05: exec_ora,
-	0x06: exec_asl,
-	0x08: exec_php,
-	0x09: exec_ora,
-	0x0A: exec_asl,
-	0x0D: exec_ora,
-	0x0E: exec_asl,
-	0x10: exec_bpl,
-	0x11: exec_ora,
-	0x15: exec_ora,
-	0x16: exec_asl,
-	0x18: exec_clc,
-	0x19: exec_ora,
-	0x1D: exec_ora,
-	0x1E: exec_asl,
-	0x20: exec_jsr,
-	0x21: exec_and,
-	0x24: exec_bit,
-	0x25: exec_and,
-	0x26: exec_rol,
-	0x28: exec_plp,
-	0x29: exec_and,
-	0x2A: exec_rol,
-	0x2C: exec_bit,
-	0x2D: exec_and,
-	0x2E: exec_rol,
-	0x30: exec_bmi,
-	0x31: exec_and,
-	0x35: exec_and,
-	0x36: exec_rol,
-	0x38: exec_sec,
-	0x39: exec_and,
-	0x3D: exec_and,
-	0x3E: exec_rol,
-	0x40: exec_rti,
-	0x41: exec_eor,
-	0x45: exec_eor,
-	0x46: exec_lsr,
-	0x48: exec_pha,
-	0x49: exec_eor,
-	0x4A: exec_lsr,
-	0x4C: exec_jmp,
-	0x4D: exec_eor,
-	0x4E: exec_lsr,
-	0x50: exec_bvc,
-	0x51: exec_eor,
-	0x55: exec_eor,
-	0x56: exec_lsr,
-	0x58: exec_cli,
-	0x59: exec_eor,
-	0x5D: exec_eor,
-	0x5E: exec_lsr,
-	0x60: exec_rts,
-	0x61: exec_adc,
-	0x65: exec_adc,
-	0x66: exec_ror,
-	0x68: exec_pla,
-	0x69: exec_adc,
-	0x6A: exec_ror,
-	0x6C: exec_jmp,
-	0x6D: exec_adc,
-	0x6E: exec_ror,
-	0x70: exec_bvs,
-	0x71: exec_adc,
-	0x75: exec_adc,
-	0x76: exec_ror,
-	0x78: exec_sei,
-	0x79: exec_adc,
-	0x7D: exec_adc,
-	0x7E: exec_ror,
-	0x81: exec_sta,
-	0x84: exec_sty,
-	0x85: exec_sta,
-	0x86: exec_stx,
-	0x88: exec_dey,
-	0x8A: exec_txa,
-	0x8C: exec_sty,
-	0x8D: exec_sta,
-	0x8E: exec_stx,
-	0x90: exec_bcc,
-	0x91: exec_sta,
-	0x94: exec_sty,
-	0x95: exec_sta,
-	0x96: exec_stx,
-	0x98: exec_tya,
-	0x99: exec_sta,
-	0x9A: exec_txs,
-	0x9D: exec_sta,
-	0xA0: exec_ldy,
-	0xA1: exec_lda,
-	0xA2: exec_ldx,
-	0xA4: exec_ldy,
-	0xA5: exec_lda,
-	0xA6: exec_ldx,
-	0xA8: exec_tay,
-	0xA9: exec_lda,
-	0xAA: exec_tax,
-	0xAC: exec_ldy,
-	0xAD: exec_lda,
-	0xAE: exec_ldx,
-	0xB0: exec_bcs,
-	0xB1: exec_lda,
-	0xB4: exec_ldy,
-	0xB5: exec_lda,
-	0xB6: exec_ldx,
-	0xB8: exec_clv,
-	0xB9: exec_lda,
-	0xBA: exec_tsx,
-	0xBC: exec_ldy,
-	0xBD: exec_lda,
-	0xBE: exec_ldx,
-	0xC0: exec_cpy,
-	0xC1: exec_cmp,
-	0xC4: exec_cpy,
-	0xC5: exec_cmp,
-	0xC6: exec_dec,
-	0xC8: exec_iny,
-	0xC9: exec_cmp,
-	0xCA: exec_dex,
-	0xCC: exec_cpy,
-	0xCD: exec_cmp,
-	0xCE: exec_dec,
-	0xD0: exec_bne,
-	0xD1: exec_cmp,
-	0xD5: exec_cmp,
-	0xD6: exec_dec,
-	0xD8: exec_cld,
-	0xD9: exec_cmp,
-	0xDD: exec_cmp,
-	0xDE: exec_dec,
-	0xE0: exec_cpx,
-	0xE1: exec_sbc,
-	0xE4: exec_cpx,
-	0xE5: exec_sbc,
-	0xE6: exec_inc,
-	0xE8: exec_inx,
-	0xE9: exec_sbc,
-	0xEA: exec_nop,
-	0xEC: exec_cpx,
-	0xED: exec_sbc,
-	0xEE: exec_inc,
-	0xF0: exec_beq,
-	0xF1: exec_sbc,
-	0xF5: exec_sbc,
-	0xF6: exec_inc,
-	0xF8: exec_sed,
-	0xF9: exec_sbc,
-	0xFD: exec_sbc,
-	0xFE: exec_inc,
+	0x00: execBrk,
+	0x01: execOra,
+	0x05: execOra,
+	0x06: execAsl,
+	0x08: execPhp,
+	0x09: execOra,
+	0x0A: execAsl,
+	0x0D: execOra,
+	0x0E: execAsl,
+	0x10: execBpl,
+	0x11: execOra,
+	0x15: execOra,
+	0x16: execAsl,
+	0x18: execClc,
+	0x19: execOra,
+	0x1D: execOra,
+	0x1E: execAsl,
+	0x20: execJsr,
+	0x21: execAnd,
+	0x24: execBit,
+	0x25: execAnd,
+	0x26: execRol,
+	0x28: execPlp,
+	0x29: execAnd,
+	0x2A: execRol,
+	0x2C: execBit,
+	0x2D: execAnd,
+	0x2E: execRol,
+	0x30: execBmi,
+	0x31: execAnd,
+	0x35: execAnd,
+	0x36: execRol,
+	0x38: execSec,
+	0x39: execAnd,
+	0x3D: execAnd,
+	0x3E: execRol,
+	0x40: execRti,
+	0x41: execEor,
+	0x45: execEor,
+	0x46: execLsr,
+	0x48: execPha,
+	0x49: execEor,
+	0x4A: execLsr,
+	0x4C: execJmp,
+	0x4D: execEor,
+	0x4E: execLsr,
+	0x50: execBvc,
+	0x51: execEor,
+	0x55: execEor,
+	0x56: execLsr,
+	0x58: execCli,
+	0x59: execEor,
+	0x5D: execEor,
+	0x5E: execLsr,
+	0x60: execRts,
+	0x61: execAdc,
+	0x65: execAdc,
+	0x66: execRor,
+	0x68: execPla,
+	0x69: execAdc,
+	0x6A: execRor,
+	0x6C: execJmp,
+	0x6D: execAdc,
+	0x6E: execRor,
+	0x70: execBvs,
+	0x71: execAdc,
+	0x75: execAdc,
+	0x76: execRor,
+	0x78: execSei,
+	0x79: execAdc,
+	0x7D: execAdc,
+	0x7E: execRor,
+	0x81: execSta,
+	0x84: execSty,
+	0x85: execSta,
+	0x86: execStx,
+	0x88: execDey,
+	0x8A: execTxa,
+	0x8C: execSty,
+	0x8D: execSta,
+	0x8E: execStx,
+	0x90: execBcc,
+	0x91: execSta,
+	0x94: execSty,
+	0x95: execSta,
+	0x96: execStx,
+	0x98: execTya,
+	0x99: execSta,
+	0x9A: execTxs,
+	0x9D: execSta,
+	0xA0: execLdy,
+	0xA1: execLda,
+	0xA2: execLdx,
+	0xA4: execLdy,
+	0xA5: execLda,
+	0xA6: execLdx,
+	0xA8: execTay,
+	0xA9: execLda,
+	0xAA: execTax,
+	0xAC: execLdy,
+	0xAD: execLda,
+	0xAE: execLdx,
+	0xB0: execBcs,
+	0xB1: execLda,
+	0xB4: execLdy,
+	0xB5: execLda,
+	0xB6: execLdx,
+	0xB8: execClv,
+	0xB9: execLda,
+	0xBA: execTsx,
+	0xBC: execLdy,
+	0xBD: execLda,
+	0xBE: execLdx,
+	0xC0: execCpy,
+	0xC1: execCmp,
+	0xC4: execCpy,
+	0xC5: execCmp,
+	0xC6: execDec,
+	0xC8: execIny,
+	0xC9: execCmp,
+	0xCA: execDex,
+	0xCC: execCpy,
+	0xCD: execCmp,
+	0xCE: execDec,
+	0xD0: execBne,
+	0xD1: execCmp,
+	0xD5: execCmp,
+	0xD6: execDec,
+	0xD8: execCld,
+	0xD9: execCmp,
+	0xDD: execCmp,
+	0xDE: execDec,
+	0xE0: execCpx,
+	0xE1: execSbc,
+	0xE4: execCpx,
+	0xE5: execSbc,
+	0xE6: execInc,
+	0xE8: execInx,
+	0xE9: execSbc,
+	0xEA: execNop,
+	0xEC: execCpx,
+	0xED: execSbc,
+	0xEE: execInc,
+	0xF0: execBeq,
+	0xF1: execSbc,
+	0xF5: execSbc,
+	0xF6: execInc,
+	0xF8: execSed,
+	0xF9: execSbc,
+	0xFD: execSbc,
+	0xFE: execInc,
 }
 
 type Cpu struct {
@@ -453,181 +453,181 @@ func (cpu *Cpu) pop16() uint16 {
 	return v
 }
 
-func get_value_acc(cpu *Cpu) uint8 {
+func getValueAcc(cpu *Cpu) uint8 {
 	return cpu.a
 }
 
-func set_value_acc(cpu *Cpu, v uint8) {
+func setValueAcc(cpu *Cpu, v uint8) {
 	cpu.a = v
 }
 
-func get_opdstr_acc(mem Memory, pc uint16) string {
+func getOpdstrAcc(mem Memory, pc uint16) string {
 	return "A"
 }
 
-func get_value_imm(cpu *Cpu) uint8 {
+func getValueImm(cpu *Cpu) uint8 {
 	return cpu.mem.Read8NoTrace(cpu.pc + 1)
 }
 
-func get_opdstr_imm(mem Memory, pc uint16) string {
+func getOpdstrImm(mem Memory, pc uint16) string {
 	return fmt.Sprintf("#$%02X", mem.Read8NoTrace(pc+1))
 }
 
-func get_opdstr_imp(mem Memory, pc uint16) string {
+func getOpdstrImp(mem Memory, pc uint16) string {
 	return ""
 }
 
-func get_addr_zrp(cpu *Cpu) uint16 {
-	return uint16(get_value_imm(cpu))
+func getAddrZrp(cpu *Cpu) uint16 {
+	return uint16(getValueImm(cpu))
 }
 
-func get_value_zrp(cpu *Cpu) uint8 {
-	return cpu.mem.Read8(get_addr_zrp(cpu))
+func getValueZrp(cpu *Cpu) uint8 {
+	return cpu.mem.Read8(getAddrZrp(cpu))
 }
 
-func set_value_zrp(cpu *Cpu, v uint8) {
-	cpu.mem.Write8(get_addr_zrp(cpu), v)
+func setValueZrp(cpu *Cpu, v uint8) {
+	cpu.mem.Write8(getAddrZrp(cpu), v)
 }
 
-func get_opdstr_zrp(mem Memory, pc uint16) string {
+func getOpdstrZrp(mem Memory, pc uint16) string {
 	return fmt.Sprintf("$%02X", mem.Read8NoTrace(pc+1))
 }
 
-func get_addr_zpx(cpu *Cpu) uint16 {
-	return uint16(get_value_imm(cpu) + cpu.x)
+func getAddrZpx(cpu *Cpu) uint16 {
+	return uint16(getValueImm(cpu) + cpu.x)
 }
 
-func get_value_zpx(cpu *Cpu) uint8 {
-	return cpu.mem.Read8(get_addr_zpx(cpu))
+func getValueZpx(cpu *Cpu) uint8 {
+	return cpu.mem.Read8(getAddrZpx(cpu))
 }
 
-func set_value_zpx(cpu *Cpu, v uint8) {
-	cpu.mem.Write8(get_addr_zpx(cpu), v)
+func setValueZpx(cpu *Cpu, v uint8) {
+	cpu.mem.Write8(getAddrZpx(cpu), v)
 }
 
-func get_opdstr_zpx(mem Memory, pc uint16) string {
+func getOpdstrZpx(mem Memory, pc uint16) string {
 	return fmt.Sprintf("$%02X,X", mem.Read8NoTrace(pc+1))
 }
 
-func get_addr_zpy(cpu *Cpu) uint16 {
-	return uint16(get_value_imm(cpu) + cpu.y)
+func getAddrZpy(cpu *Cpu) uint16 {
+	return uint16(getValueImm(cpu) + cpu.y)
 }
 
-func get_value_zpy(cpu *Cpu) uint8 {
-	return cpu.mem.Read8NoTrace(get_addr_zpy(cpu))
+func getValueZpy(cpu *Cpu) uint8 {
+	return cpu.mem.Read8NoTrace(getAddrZpy(cpu))
 }
 
-func set_value_zpy(cpu *Cpu, v uint8) {
-	cpu.mem.Write8(get_addr_zpy(cpu), v)
+func setValueZpy(cpu *Cpu, v uint8) {
+	cpu.mem.Write8(getAddrZpy(cpu), v)
 }
 
-func get_opdstr_zpy(mem Memory, pc uint16) string {
+func getOpdstrZpy(mem Memory, pc uint16) string {
 	return fmt.Sprintf("$%02X,Y", mem.Read8NoTrace(pc+1))
 }
 
-func get_addr_ind(cpu *Cpu) uint16 {
+func getAddrInd(cpu *Cpu) uint16 {
 	a := cpu.mem.Read16NoTrace(cpu.pc + 1)
 	lo := cpu.mem.Read8NoTrace(a)
 	hi := cpu.mem.Read8NoTrace(a&0xff00 | uint16(uint8(a&0x0ff)+1))
 	return uint16(hi)<<8 | uint16(lo)
 }
 
-func get_opdstr_ind(mem Memory, pc uint16) string {
+func getOpdstrInd(mem Memory, pc uint16) string {
 	return fmt.Sprintf("($%04X)", mem.Read16NoTrace(pc+1))
 }
 
-func get_addr_abs(cpu *Cpu) uint16 {
+func getAddrAbs(cpu *Cpu) uint16 {
 	return cpu.mem.Read16NoTrace(cpu.pc + 1)
 }
 
-func get_value_abs(cpu *Cpu) uint8 {
-	return cpu.mem.Read8NoTrace(get_addr_abs(cpu))
+func getValueAbs(cpu *Cpu) uint8 {
+	return cpu.mem.Read8NoTrace(getAddrAbs(cpu))
 }
 
-func set_value_abs(cpu *Cpu, v uint8) {
-	cpu.mem.Write8(get_addr_abs(cpu), v)
+func setValueAbs(cpu *Cpu, v uint8) {
+	cpu.mem.Write8(getAddrAbs(cpu), v)
 }
 
-func get_opdstr_abs(mem Memory, pc uint16) string {
+func getOpdstrAbs(mem Memory, pc uint16) string {
 	return fmt.Sprintf("$%04X", mem.Read16NoTrace(pc+1))
 }
 
-func get_addr_abx(cpu *Cpu) uint16 {
+func getAddrAbx(cpu *Cpu) uint16 {
 	return cpu.mem.Read16NoTrace(cpu.pc+1) + uint16(cpu.x)
 }
 
-func get_value_abx(cpu *Cpu) uint8 {
-	return cpu.mem.Read8(get_addr_abx(cpu))
+func getValueAbx(cpu *Cpu) uint8 {
+	return cpu.mem.Read8(getAddrAbx(cpu))
 }
 
-func set_value_abx(cpu *Cpu, v uint8) {
-	cpu.mem.Write8(get_addr_abx(cpu), v)
+func setValueAbx(cpu *Cpu, v uint8) {
+	cpu.mem.Write8(getAddrAbx(cpu), v)
 }
 
-func get_opdstr_abx(mem Memory, pc uint16) string {
+func getOpdstrAbx(mem Memory, pc uint16) string {
 	return fmt.Sprintf("$%04X,x", mem.Read16NoTrace(pc+1))
 }
 
-func get_addr_aby(cpu *Cpu) uint16 {
+func getAddrAby(cpu *Cpu) uint16 {
 	return cpu.mem.Read16NoTrace(cpu.pc+1) + uint16(cpu.y)
 }
 
-func get_value_aby(cpu *Cpu) uint8 {
-	return cpu.mem.Read8(get_addr_aby(cpu))
+func getValueAby(cpu *Cpu) uint8 {
+	return cpu.mem.Read8(getAddrAby(cpu))
 }
 
-func set_value_aby(cpu *Cpu, v uint8) {
-	cpu.mem.Write8(get_addr_aby(cpu), v)
+func setValueAby(cpu *Cpu, v uint8) {
+	cpu.mem.Write8(getAddrAby(cpu), v)
 }
 
-func get_opdstr_aby(mem Memory, pc uint16) string {
+func getOpdstrAby(mem Memory, pc uint16) string {
 	return fmt.Sprintf("$%04X,y", mem.Read16NoTrace(pc+1))
 }
 
-func get_addr_inx(cpu *Cpu) uint16 {
-	a := get_value_imm(cpu) + cpu.x
+func getAddrInx(cpu *Cpu) uint16 {
+	a := getValueImm(cpu) + cpu.x
 	u := uint16(cpu.mem.Read8NoTrace(uint16(a)))
 	u |= uint16(cpu.mem.Read8NoTrace(uint16(a+1))) << 8
 	return u
 }
 
-func get_value_inx(cpu *Cpu) uint8 {
-	return cpu.mem.Read8(get_addr_inx(cpu))
+func getValueInx(cpu *Cpu) uint8 {
+	return cpu.mem.Read8(getAddrInx(cpu))
 }
 
-func set_value_inx(cpu *Cpu, v uint8) {
-	cpu.mem.Write8(get_addr_inx(cpu), v)
+func setValueInx(cpu *Cpu, v uint8) {
+	cpu.mem.Write8(getAddrInx(cpu), v)
 }
 
-func get_opdstr_inx(mem Memory, pc uint16) string {
+func getOpdstrInx(mem Memory, pc uint16) string {
 	return fmt.Sprintf("($%02X,X)", mem.Read8NoTrace(pc+1))
 }
 
-func get_addr_iny(cpu *Cpu) uint16 {
-	a := get_value_imm(cpu)
+func getAddrIny(cpu *Cpu) uint16 {
+	a := getValueImm(cpu)
 	lo := cpu.mem.Read8NoTrace(uint16(a))
 	hi := cpu.mem.Read8NoTrace(uint16(a + 1))
 	return (uint16(hi)<<8 | uint16(lo)) + uint16(cpu.y)
 }
 
-func get_value_iny(cpu *Cpu) uint8 {
-	return cpu.mem.Read8(get_addr_iny(cpu))
+func getValueIny(cpu *Cpu) uint8 {
+	return cpu.mem.Read8(getAddrIny(cpu))
 }
 
-func set_value_iny(cpu *Cpu, v uint8) {
-	cpu.mem.Write8(get_addr_iny(cpu), v)
+func setValueIny(cpu *Cpu, v uint8) {
+	cpu.mem.Write8(getAddrIny(cpu), v)
 }
 
-func get_opdstr_iny(mem Memory, pc uint16) string {
+func getOpdstrIny(mem Memory, pc uint16) string {
 	return fmt.Sprintf("($%02X,Y)", mem.Read8NoTrace(pc+1))
 }
 
-func get_opdstr_rel(mem Memory, pc uint16) string {
+func getOpdstrRel(mem Memory, pc uint16) string {
 	d := uint16(int(pc+2) + int(int8(mem.Read8NoTrace(pc+1))))
 	return fmt.Sprintf("$%04X", d)
 }
 
-func update_flags_nz(v uint8, cpu *Cpu) {
+func updateFlagsNz(v uint8, cpu *Cpu) {
 	cpu.p &= ^(P_N | P_Z)
 	if v&0x80 != 0 {
 		cpu.p |= P_N
@@ -637,96 +637,96 @@ func update_flags_nz(v uint8, cpu *Cpu) {
 	}
 }
 
-func exec_lda(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execLda(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.a = modeOpsTable[mode].getValue(cpu)
-	update_flags_nz(cpu.a, cpu)
+	updateFlagsNz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_ldx(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execLdx(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.x = modeOpsTable[mode].getValue(cpu)
-	update_flags_nz(cpu.x, cpu)
+	updateFlagsNz(cpu.x, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_ldy(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execLdy(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.y = modeOpsTable[mode].getValue(cpu)
-	update_flags_nz(cpu.y, cpu)
+	updateFlagsNz(cpu.y, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_jmp(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execJmp(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.pc = modeOpsTable[mode].getAddress(cpu)
 	return instTable[opc].cycle
 }
 
-func exec_sta(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execSta(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	modeOpsTable[mode].setValue(cpu, cpu.a)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_stx(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execStx(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	modeOpsTable[mode].setValue(cpu, cpu.x)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_sty(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execSty(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	modeOpsTable[mode].setValue(cpu, cpu.y)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_tax(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execTax(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.x = cpu.a
-	update_flags_nz(cpu.x, cpu)
+	updateFlagsNz(cpu.x, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_txa(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execTxa(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.a = cpu.x
-	update_flags_nz(cpu.a, cpu)
+	updateFlagsNz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_txs(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execTxs(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.s = cpu.x
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_tsx(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execTsx(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.x = cpu.s
-	update_flags_nz(cpu.x, cpu)
+	updateFlagsNz(cpu.x, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_tya(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execTya(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.a = cpu.y
-	update_flags_nz(cpu.a, cpu)
+	updateFlagsNz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_tay(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execTay(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.y = cpu.a
-	update_flags_nz(cpu.y, cpu)
+	updateFlagsNz(cpu.y, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_adc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
-	a_prev := cpu.a
+func execAdc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	aPrev := cpu.a
 	m := modeOpsTable[mode].getValue(cpu)
 	u := uint16(cpu.a) + uint16(m) + uint16(cpu.p&P_C)
-	v := int(int8(a_prev)) + int(int8(m)) + int(cpu.p&P_C)
+	v := int(int8(aPrev)) + int(int8(m)) + int(cpu.p&P_C)
 	cpu.a = uint8(u)
 
 	cpu.p &= ^(P_C | P_V)
@@ -736,20 +736,20 @@ func exec_adc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	if v < -128 || v > 127 {
 		cpu.p |= P_V
 	}
-	update_flags_nz(cpu.a, cpu)
+	updateFlagsNz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_and(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execAnd(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	v := modeOpsTable[mode].getValue(cpu)
 	cpu.a &= v
-	update_flags_nz(cpu.a, cpu)
+	updateFlagsNz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_asl(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execAsl(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	v := modeOpsTable[mode].getValue(cpu)
 	if (v & 0x80) != 0 {
 		cpu.p |= P_C
@@ -758,12 +758,12 @@ func exec_asl(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	}
 	v <<= 1
 	modeOpsTable[mode].setValue(cpu, v)
-	update_flags_nz(v, cpu)
+	updateFlagsNz(v, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_bit(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execBit(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p &= ^(P_V | P_N | P_Z)
 	v := modeOpsTable[mode].getValue(cpu)
 	if v&0x40 != 0 {
@@ -779,7 +779,7 @@ func exec_bit(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	return instTable[opc].cycle
 }
 
-func cmp_gen(u uint8, v uint8, cpu *Cpu) {
+func cmpGen(u uint8, v uint8, cpu *Cpu) {
 	cpu.p &= ^(P_C | P_Z | P_N)
 	if u >= v {
 		cpu.p |= P_C
@@ -792,91 +792,91 @@ func cmp_gen(u uint8, v uint8, cpu *Cpu) {
 	}
 }
 
-func exec_cmp(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execCmp(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	m := modeOpsTable[mode].getValue(cpu)
-	cmp_gen(cpu.a, m, cpu)
+	cmpGen(cpu.a, m, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_cld(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execCld(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p &= ^P_D
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_sed(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execSed(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p |= P_D
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_cpx(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execCpx(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	v := modeOpsTable[mode].getValue(cpu)
-	cmp_gen(cpu.x, v, cpu)
+	cmpGen(cpu.x, v, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_cpy(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execCpy(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	v := modeOpsTable[mode].getValue(cpu)
-	cmp_gen(cpu.y, v, cpu)
+	cmpGen(cpu.y, v, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_dec(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execDec(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	v := modeOpsTable[mode].getValue(cpu) - 1
 	modeOpsTable[mode].setValue(cpu, v)
-	update_flags_nz(v, cpu)
+	updateFlagsNz(v, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_dex(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execDex(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.x--
-	update_flags_nz(cpu.x, cpu)
+	updateFlagsNz(cpu.x, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_dey(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execDey(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.y--
-	update_flags_nz(cpu.y, cpu)
+	updateFlagsNz(cpu.y, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_inc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execInc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	v := modeOpsTable[mode].getValue(cpu) + 1
 	modeOpsTable[mode].setValue(cpu, v)
-	update_flags_nz(v, cpu)
+	updateFlagsNz(v, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_inx(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execInx(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.x++
-	update_flags_nz(cpu.x, cpu)
+	updateFlagsNz(cpu.x, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_iny(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execIny(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.y++
-	update_flags_nz(cpu.y, cpu)
+	updateFlagsNz(cpu.y, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_eor(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execEor(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.a ^= modeOpsTable[mode].getValue(cpu)
-	update_flags_nz(cpu.a, cpu)
+	updateFlagsNz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_lsr(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execLsr(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	u := modeOpsTable[mode].getValue(cpu)
 	v := u >> 1
 	cpu.p &= ^(P_C | P_Z | P_N)
@@ -884,20 +884,20 @@ func exec_lsr(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 		cpu.p |= P_C
 	}
 	modeOpsTable[mode].setValue(cpu, v)
-	update_flags_nz(v, cpu)
+	updateFlagsNz(v, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_ora(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execOra(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	v := modeOpsTable[mode].getValue(cpu)
 	cpu.a |= v
-	update_flags_nz(cpu.a, cpu)
+	updateFlagsNz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_rol(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execRol(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	oldCarry := cpu.p & P_C
 	u := modeOpsTable[mode].getValue(cpu)
 	v := u << 1
@@ -921,7 +921,7 @@ func exec_rol(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	return instTable[opc].cycle
 }
 
-func exec_ror(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execRor(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	u := modeOpsTable[mode].getValue(cpu)
 	v := u >> 1
 	if cpu.p&P_C != 0 {
@@ -942,73 +942,73 @@ func exec_ror(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	return instTable[opc].cycle
 }
 
-func exec_sbc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
-	a_prev := cpu.a
+func execSbc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	aPrev := cpu.a
 	m := modeOpsTable[mode].getValue(cpu)
 	v := m + (1 - cpu.p&P_C)
 	cpu.a = cpu.a - v
-	u := int(int8(a_prev)) - int(int8(m)) - int(1-cpu.p&P_C)
+	u := int(int8(aPrev)) - int(int8(m)) - int(1-cpu.p&P_C)
 	cpu.p &= ^(P_C | P_V)
-	if a_prev >= v {
+	if aPrev >= v {
 		cpu.p |= P_C
 	}
 	if u < -128 || u > 127 {
 		cpu.p |= P_V
 	}
-	update_flags_nz(cpu.a, cpu)
+	updateFlagsNz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_pha(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execPha(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.push8(cpu.a)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_php(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execPhp(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.push8(cpu.p)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_pla(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execPla(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.a = cpu.pop8()
-	update_flags_nz(cpu.a, cpu)
+	updateFlagsNz(cpu.a, cpu)
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_plp(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execPlp(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p = cpu.pop8() | P_R
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_jsr(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execJsr(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.push16(uint16(cpu.pc + 2))
-	cpu.pc = get_addr_abs(cpu)
+	cpu.pc = getAddrAbs(cpu)
 	return instTable[opc].cycle
 }
 
-func exec_rts(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execRts(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.pc = cpu.pop16()
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_rti(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execRti(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p = cpu.pop8() | P_R
 	cpu.pc = cpu.pop16()
 	return instTable[opc].cycle
 }
 
-func exec_branch_gen(cpu *Cpu, opc uint8, mode InstMode, bytes uint, v bool) uint {
+func execBranchGen(cpu *Cpu, opc uint8, mode InstMode, bytes uint, v bool) uint {
 	var extracycle uint = 0
 	if v {
 		extracycle = 1
 		nextpc := cpu.pc + uint16(bytes)
-		cpu.pc = uint16(int(nextpc) + int(int8(get_value_imm(cpu))))
+		cpu.pc = uint16(int(nextpc) + int(int8(getValueImm(cpu))))
 		if nextpc>>8 != cpu.pc>>8 {
 			extracycle = 2
 		}
@@ -1018,69 +1018,69 @@ func exec_branch_gen(cpu *Cpu, opc uint8, mode InstMode, bytes uint, v bool) uin
 	return instTable[opc].cycle + extracycle
 }
 
-func exec_bmi(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
-	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_N != 0)
+func execBmi(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return execBranchGen(cpu, opc, mode, bytes, cpu.p&P_N != 0)
 }
 
-func exec_bcc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
-	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_C == 0)
+func execBcc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return execBranchGen(cpu, opc, mode, bytes, cpu.p&P_C == 0)
 }
 
-func exec_bcs(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
-	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_C != 0)
+func execBcs(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return execBranchGen(cpu, opc, mode, bytes, cpu.p&P_C != 0)
 }
 
-func exec_beq(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
-	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_Z != 0)
+func execBeq(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return execBranchGen(cpu, opc, mode, bytes, cpu.p&P_Z != 0)
 }
 
-func exec_bne(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
-	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_Z == 0)
+func execBne(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return execBranchGen(cpu, opc, mode, bytes, cpu.p&P_Z == 0)
 }
 
-func exec_bpl(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
-	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_N == 0)
+func execBpl(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return execBranchGen(cpu, opc, mode, bytes, cpu.p&P_N == 0)
 }
 
-func exec_bvc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
-	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_V == 0)
+func execBvc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return execBranchGen(cpu, opc, mode, bytes, cpu.p&P_V == 0)
 }
 
-func exec_bvs(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
-	return exec_branch_gen(cpu, opc, mode, bytes, cpu.p&P_V != 0)
+func execBvs(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+	return execBranchGen(cpu, opc, mode, bytes, cpu.p&P_V != 0)
 }
 
-func exec_clc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execClc(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p &= ^P_C
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_cli(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execCli(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p &= ^P_I
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_clv(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execClv(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p &= ^P_V
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_sec(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execSec(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p |= P_C
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_sei(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execSei(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.p |= P_I
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
 
-func exec_brk(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execBrk(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.push16(cpu.pc)
 	cpu.push8(cpu.p)
 	cpu.pc = cpu.mem.Read16(VEC_IRQ)
@@ -1088,7 +1088,7 @@ func exec_brk(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	return instTable[opc].cycle
 }
 
-func exec_nop(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
+func execNop(cpu *Cpu, opc uint8, mode InstMode, bytes uint) uint {
 	cpu.pc += uint16(bytes)
 	return instTable[opc].cycle
 }
@@ -1099,7 +1099,7 @@ func (cpu *Cpu) setNmi() {
 
 func (cpu *Cpu) executeInst() uint {
 	if cpu.nmiLatched {
-		Debug("NMI latched\n")
+		//Debug("NMI latched\n")
 		cpu.nmiLatched = false
 		cpu.push16(cpu.pc)
 		cpu.push8(cpu.p)

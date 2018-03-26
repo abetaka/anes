@@ -122,24 +122,6 @@ func (mcw *MyCustomWidget) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uin
 	return mcw.CustomWidget.WndProc(hwnd, msg, wParam, lParam)
 }
 
-func makeKeyDownHandler(pad *nespkg.Gamepad) func(key walk.Key) {
-	return func(key walk.Key) {
-		button, ok := gamepadButtonMap[key]
-		if ok {
-			pad.SetButtonState(button, true)
-		}
-	}
-}
-
-func makeKeyUpHandler(pad *nespkg.Gamepad) func(key walk.Key) {
-	return func(key walk.Key) {
-		button, ok := gamepadButtonMap[key]
-		if ok {
-			pad.SetButtonState(button, false)
-		}
-	}
-}
-
 func makePaintFunc(display *NesDisplay) func(canvas *walk.Canvas, updateBounds walk.Rectangle) error {
 	return func(canvas *walk.Canvas, updateBounds walk.Rectangle) error {
 		bmp, err := createBitmap(display)
@@ -181,14 +163,32 @@ func createBitmap(display *NesDisplay) (*walk.Bitmap, error) {
 	return bmp, nil
 }
 
+func makeKeyDownCallback(nes *nespkg.Nes) func(walk.Key) {
+	return func(k walk.Key) {
+		button, ok := gamepadButtonMap[k]
+		if ok {
+			nes.Kbd.KeyDownCallback(button)
+		}
+	}
+}
+
+func makeKeyUpCallback(nes *nespkg.Nes) func(walk.Key) {
+	return func(k walk.Key) {
+		button, ok := gamepadButtonMap[k]
+		if ok {
+			nes.Kbd.KeyUpCallback(button)
+		}
+	}
+}
+
 func runMyWidget(display *NesDisplay, nes *nespkg.Nes) {
 	var mw *walk.MainWindow
 	if err := (MainWindow{
 		AssignTo:  &mw,
 		Title:     "ANES",
 		Size:      Size{nespkg.ScreenSizePixX * 2, nespkg.ScreenSizePixY * 2},
-		OnKeyDown: makeKeyDownHandler(nes.Pad),
-		OnKeyUp:   makeKeyUpHandler(nes.Pad),
+		OnKeyDown: makeKeyDownCallback(nes),
+		OnKeyUp:   makeKeyUpCallback(nes),
 		Layout:    VBox{MarginsZero: true},
 	}).Create(); err != nil {
 		log.Fatal(err)

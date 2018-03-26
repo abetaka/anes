@@ -84,7 +84,7 @@ func (ppu *Ppu) readMmapReg(address uint16) uint8 {
 }
 
 func (ppu *Ppu) writePpuctrl(v uint8) {
-	Debug("writePpuctrl: %02Xh\n", v)
+	//Debug("writePpuctrl: %02Xh\n", v)
 	ppu.ppuctrl = v
 }
 
@@ -163,12 +163,12 @@ func (ppu *Ppu) emphasizeBlue() bool {
 func (ppu *Ppu) readPpustatus() uint8 {
 	v := ppu.ppustatus
 	ppu.ppustatus &= ^PPUSTATUS_V
-	Debug("ppustatus=%02Xh\n", v)
+	//Debug("ppustatus=%02Xh\n", v)
 	return v
 }
 
 func (ppu *Ppu) writePpuscroll(v uint8) {
-	Debug("writePpuscroll: %02Xh\n", v)
+	//Debug("writePpuscroll: %02Xh\n", v)
 	if ppu.ppuscrollw {
 		ppu.ppuscrollynew = v
 		ppu.ppuscrollw = false
@@ -201,7 +201,7 @@ func (ppu *Ppu) incPpuaddr() {
 }
 
 func (ppu *Ppu) writePpudata(v uint8) {
-	Debug("ppu.ppuaddr=%04X data=%02X\n", ppu.ppuaddr, v)
+	//Debug("ppu.ppuaddr=%04X data=%02X\n", ppu.ppuaddr, v)
 	ppu.lvram[vramPage(ppu.ppuaddr)][vramOffest(ppu.ppuaddr)] = v
 	ppu.incPpuaddr()
 }
@@ -304,6 +304,7 @@ func (ppu *Ppu) renderPixel(col uint, row uint) {
 			(bits(uint(hi), tileSize-1-x%tileSize, 1) << 1)
 		if pix == 0 {
 			ppu.screen[row][col] = ppu.bgPalette[0][0]
+			//Debug("ppu.bgPalette[0][0]=%02X\n", ppu.bgPalette[0][0])
 		} else {
 			ppu.screen[row][col] = ppu.bgPalette[paletteIndex][pix]
 		}
@@ -317,7 +318,7 @@ func (ppu *Ppu) renderPixel(col uint, row uint) {
 
 	if ppu.ppustatus&PPUSTATUS_S == 0 && ppu.showSprite() && ppu.showBg() {
 		if ppu.oamMap[row][col] == 0 && ppu.screen[row][col] != 0 {
-			Debug("Sprite zero hit\n")
+			//Debug("Sprite zero hit\n")
 			ppu.ppustatus |= PPUSTATUS_S
 		}
 	}
@@ -452,10 +453,10 @@ func (ppu *Ppu) putSpriteTile(sp *Sprite, x int, y int, bottomHalf bool) {
 				c = ppu.spPalette[sp.paletteIndex()][pix]
 			}
 
-			u := (x + i) % ScreenSizePixX
-			v := (y + j) % ScreenSizePixY
-			ppu.oamScreen[v][u] = c
-			if c != 0 {
+			u := x + i
+			v := y + j
+			if c != 0 && u < ScreenSizePixX && v < ScreenSizePixY {
+				ppu.oamScreen[v][u] = c
 				ppu.oamMap[v][u] = uint8(sp.index)
 			}
 		}
@@ -501,7 +502,7 @@ func (ppu *Ppu) giveCpuClockDelta(cpuclockDelta uint) bool {
 		}
 
 		if row == postRenderScanline {
-			Debug("firstVBlankScanline\n")
+			//Debug("firstVBlankScanline\n")
 			ppu.ppustatus |= PPUSTATUS_V
 			if ppu.vblankNmi() {
 				ppu.nes.cpu.setNmi()
@@ -509,7 +510,7 @@ func (ppu *Ppu) giveCpuClockDelta(cpuclockDelta uint) bool {
 		}
 
 		if row == lastVisibleScanline {
-			Debug("lastVisibleScanline\n")
+			//Debug("lastVisibleScanline\n")
 			ppu.nes.display.Render(&ppu.screen)
 			lvs = true
 		}

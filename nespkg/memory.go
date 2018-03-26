@@ -45,7 +45,7 @@ func (m *MainMemory) Read8NoTrace(address uint16) uint8 {
 	if isPpuRegAddress(address) {
 		return m.nes.ppu.readMmapReg(address)
 	} else if isGamepadAddress(address) {
-		return m.nes.Pad.regRead(address)
+		return m.nes.Pad[0].regRead()
 	}
 	return m.mem[page(address)][offset(address)]
 }
@@ -70,7 +70,7 @@ func (m *MainMemory) Write8NoTrace(address uint16, val uint8) {
 	} else if isPpuRegAddress(address) {
 		m.nes.ppu.writeMmapReg(address, val)
 	} else if isGamepadAddress(address) {
-		m.nes.Pad.regWrite(address, val)
+		m.nes.Pad[0].regWrite(val)
 	} else if address >= 0x8000 && address <= 0xffff {
 		m.nes.mapper.regWrite8(address, val)
 	}
