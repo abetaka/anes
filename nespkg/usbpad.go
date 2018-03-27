@@ -2,12 +2,13 @@ package nespkg
 
 import (
 	"github.com/simulatedsimian/joystick"
+	"time"
 )
 
 type UsbGamePad struct {
 	js            joystick.Joystick
-	calibX        int
-	calibY        int
+	centerX       int
+	centerY       int
 	strobe        bool
 	buttonPressed [ButtonMax]bool
 	currentButton GamepadButton
@@ -37,15 +38,14 @@ func (pad *UsbGamePad) scan() {
 
 	state, err := pad.js.Read()
 	if err == nil {
-		//Debug("X=%d Y=%d Buttons=%X\n", state.AxisData[0], state.AxisData[1], state.Buttons)
-		x := state.AxisData[0] - pad.calibX
+		x := state.AxisData[0] - pad.centerX
 		if x < 0 {
 			pad.buttonPressed[ButtonLeft] = true
 		} else if x > 0 {
 			pad.buttonPressed[ButtonRight] = true
 		}
 
-		y := state.AxisData[1] - pad.calibY
+		y := state.AxisData[1] - pad.centerY
 		if y < 0 {
 			pad.buttonPressed[ButtonUp] = true
 		} else if y > 0 {
@@ -83,10 +83,17 @@ func NewUsbGamepad(jsid int) *UsbGamePad {
 
 	pad := new(UsbGamePad)
 	pad.js = js
+	time.Sleep(time.Second * 1)
+	state, err := pad.js.Read()
+	if err == nil {
+		pad.centerX = state.AxisData[0]
+		pad.centerY = state.AxisData[1]
+	} else {
+		pad.centerX = -256
+		pad.centerY = -256
+	}
 
-	pad.calibX = -256
-	pad.calibY = -256
-	Debug("calibX=%d calibY=%d\n", pad.calibX, pad.calibY)
+	Debug("centerX=%d centerY=%d\n", pad.centerX, pad.centerY)
 
 	pad.strobe = false
 	for i := range pad.buttonPressed {
