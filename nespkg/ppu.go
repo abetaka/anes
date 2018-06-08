@@ -41,6 +41,7 @@ type Ppu struct {
 	spPalette       [4][]uint8
 	screen          [ScreenSizePixY][ScreenSizePixX]uint8
 	oamScreen       [ScreenSizePixY][ScreenSizePixX]uint8
+	oamBehindBg     [ScreenSizePixY][ScreenSizePixX]bool
 	oamMap          [ScreenSizePixY][ScreenSizePixX]uint8
 	oddframe        bool
 	currentScanline uint
@@ -310,10 +311,8 @@ func (ppu *Ppu) renderPixel(col uint, row uint) {
 		}
 	}
 
-	if ppu.showSprite() {
-		if ppu.oamScreen[row][col] != 0 {
-			ppu.screen[row][col] = ppu.oamScreen[row][col]
-		}
+	if ppu.showSprite() && ppu.oamScreen[row][col] != 0 && !(ppu.oamBehindBg[row][col] && ppu.screen[row][col] != ppu.bgPalette[0][0]) {
+		ppu.screen[row][col] = ppu.oamScreen[row][col]
 	}
 
 	if ppu.ppustatus&PPUSTATUS_S == 0 && ppu.showSprite() && ppu.showBg() {
@@ -328,13 +327,18 @@ func vramPage(a uint16) uint {
 	return uint(a) >> vramPageShift
 }
 
-func vramOffest(a uint16) uint {
-	// 0x3F20-0x3FFF: mirrors of 0x3F00-0x3F1F
+func vramAddressFix(a uint16) uint16 {
 	if a >= 0x3F20 && a < 0x4000 {
+		// 0x3F20-0x3FFF: mirrors of 0x3F00-0x3F1F
 		a &= 0xFF1F
+	} else if a == 0x3f10 || a == 0x3f14 || a == 0x3f18 || a == 0x3fc0 {
+		a &= 0x3f0f
 	}
+	return a
+}
 
-	return uint(a) & (vramPageSize - 1)
+func vramOffest(a uint16) uint {
+	return uint(vramAddressFix(a)) & (vramPageSize - 1)
 }
 
 func (ppu *Ppu) mapExtMem(address uint16, extmem []uint8, bytes int) {
@@ -418,8 +422,8 @@ func (sp *Sprite) paletteIndex() int {
 	return int(bits(uint(sp.oam[2]), 0, 2))
 }
 
-func (sp *Sprite) priority() int {
-	return int(bits(uint(sp.oam[2]), 5, 1))
+func (sp *Sprite) behindBg() bool {
+	return int(bits(uint(sp.oam[2]), 5, 1)) != 0
 }
 
 func (sp *Sprite) hFlip() bool {
@@ -430,7 +434,7 @@ func (sp *Sprite) vFlip() bool {
 	return bits(uint(sp.oam[2]), 7, 1) == 1
 }
 
-func (ppu *Ppu) putSpriteTile(sp *Sprite, x int, y int, bottomHalf bool) {
+func (ppu *Ppu) putSpriteTile(sp *Sprite, x int, y int, bottomHalf bool, behindBg bool) {
 	base := sp.patternAddress(ppu, bottomHalf)
 	for j := 0; j < 8; j++ {
 		var lo, hi uint8
@@ -457,6 +461,7 @@ func (ppu *Ppu) putSpriteTile(sp *Sprite, x int, y int, bottomHalf bool) {
 			v := y + j
 			if c != 0 && u < ScreenSizePixX && v < ScreenSizePixY {
 				ppu.oamScreen[v][u] = c
+				ppu.oamBehindBg[v][u] = behindBg
 				ppu.oamMap[v][u] = uint8(sp.index)
 			}
 		}
@@ -468,9 +473,10 @@ func (ppu *Ppu) preRenderSprite(spriteIndex int) {
 	if sp.visible() {
 		x := sp.posX()
 		y := sp.posY()
-		ppu.putSpriteTile(sp, x, y, false)
+		behindBg := sp.behindBg()
+		ppu.putSpriteTile(sp, x, y, false, behindBg)
 		if !ppu.spriteSize8x8() {
-			ppu.putSpriteTile(sp, x, y+8, true)
+			ppu.putSpriteTile(sp, x, y+8, true, behindBg)
 		}
 	}
 }
@@ -479,6 +485,7 @@ func (ppu *Ppu) prepSprite() {
 	for i := 0; i < ScreenSizePixY; i++ {
 		for j := 0; j < ScreenSizePixX; j++ {
 			ppu.oamScreen[i][j] = 0
+			ppu.oamBehindBg[i][j] = false
 		}
 	}
 
