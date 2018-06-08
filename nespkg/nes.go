@@ -412,33 +412,50 @@ func NewDbgCmdMem(args []string) (DbgCmd, error) {
 	return c, nil
 }
 
-type DbgCmdVramRead struct {
+type DbgCmdVramReadWrite struct {
 	DbgCmdBase
 	address uint16
 	length  int
+	val     uint8
+	write   bool
 }
 
 func NewDbgCmdVramRead(args []string) (DbgCmd, error) {
-	if len(args) != 2 {
+	if len(args) != 2 && len(args) != 3 {
 		return nil, errors.New("vramread: invalid arguments")
 	}
-	c := new(DbgCmdVramRead)
+	c := new(DbgCmdVramReadWrite)
 	if a, err := strconv.ParseUint(args[0], 16, 16); err == nil {
 		c.address = uint16(a)
 	} else {
 		return nil, errors.New("vramread: invalid arguments")
 	}
-	if l, err := strconv.ParseInt(args[1], 16, 0); err == nil {
-		c.length = int(l)
+
+	if args[1] == "=" {
+		c.write = true
+		if u, err := strconv.ParseInt(args[2], 16, 0); err == nil {
+			c.val = uint8(u)
+		} else {
+			return nil, errors.New("vramread: invalid arguments")
+		}
 	} else {
-		return nil, errors.New("vramread: invalid arguments")
+		c.write = false
+		if l, err := strconv.ParseInt(args[1], 16, 0); err == nil {
+			c.length = int(l)
+		} else {
+			return nil, errors.New("vramread: invalid arguments")
+		}
 	}
 	return c, nil
 }
 
-func (cmd *DbgCmdVramRead) execCmd(dbg *Debugger) bool {
+func (cmd *DbgCmdVramReadWrite) execCmd(dbg *Debugger) bool {
 	r := func(a uint16) uint8 { return dbg.nes.ppu.vramRead8(a) }
-	dumpMem(r, cmd.address, cmd.length)
+	if cmd.write {
+		dbg.nes.ppu.vramWrite8(cmd.address, cmd.val)
+	} else {
+		dumpMem(r, cmd.address, cmd.length)
+	}
 	return true
 }
 
