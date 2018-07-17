@@ -31,5 +31,22 @@ func (pad *KbdPad) regWrite(val uint8) {
 func NewKbdGamepad(reader *KbdReader) *KbdPad {
 	pad := new(KbdPad)
 	pad.reader = reader
+	Debug("Kbd pad installed")
+	return pad
+}
+
+type DummyGamepad struct {
+}
+
+func (pad *DummyGamepad) regRead() uint8 {
+	return 0
+}
+
+func (pad *DummyGamepad) regWrite(val uint8) {
+	return
+}
+
+func NewDummyGamepad() *DummyGamepad {
+	pad := new(DummyGamepad)
 	return pad
 }

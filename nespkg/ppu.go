@@ -26,6 +26,7 @@ type Ppu struct {
 	oamaddr         uint8
 	oamdma          uint8
 	ppuscrollx      uint8
+	ppuscrollxnew   uint8
 	ppuscrolly      uint8
 	ppuscrollynew   uint8
 	ppuscrollw      bool
@@ -174,7 +175,7 @@ func (ppu *Ppu) writePpuscroll(v uint8) {
 		ppu.ppuscrollynew = v
 		ppu.ppuscrollw = false
 	} else {
-		ppu.ppuscrollx = v
+		ppu.ppuscrollxnew = v
 		ppu.ppuscrollw = true
 	}
 }
@@ -248,6 +249,7 @@ func (ppu *Ppu) RenderScreen() {
 }
 
 func (ppu *Ppu) renderScanline(row uint) {
+	ppu.ppuscrollx = ppu.ppuscrollxnew
 	for col := 0; col < ScreenSizePixX; col++ {
 		ppu.renderPixel(uint(col), row)
 	}

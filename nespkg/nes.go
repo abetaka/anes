@@ -103,10 +103,14 @@ func NewNes(conf *Conf, d Display) *Nes {
 	nes.Kbd = NewKbdReader()
 	nes.cpu.mem = nes.mem
 	nes.display = d
-	nes.Pad[0] = NewUsbGamepad(0)
-	if nes.Pad[0] == nil {
+	pad0 := NewUsbGamepad(0)
+	if pad0 == nil {
+		Debug("Installing Kbd gamepad\n")
 		nes.Pad[0] = NewKbdGamepad(nes.Kbd)
+	} else {
+		nes.Pad[0] = pad0
 	}
+	nes.Pad[1] = NewDummyGamepad()
 	nes.dbg = NewDebugger(conf, nes)
 	Debug("NewNes: nes=%p\n", nes)
 	return nes

@@ -78,6 +78,7 @@ func (pad *UsbGamePad) regWrite(val uint8) {
 func NewUsbGamepad(jsid int) *UsbGamePad {
 	js, err := joystick.Open(jsid)
 	if err != nil {
+		Debug("USB gamepad not found\n")
 		return nil
 	}
 

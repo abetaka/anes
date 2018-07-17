@@ -248,7 +248,7 @@ func NewMyCustomWidget(parent walk.Container, display *NesDisplay, nes *nespkg.N
 	}
 
 	mcw := &MyCustomWidget{cw, display, nes, false}
-	mcw.SetClearsBackground(true)
+	mcw.SetPaintMode(walk.PaintBuffered)
 
 	if err := walk.InitWrapperWindow(mcw); err != nil {
 		return nil, err
