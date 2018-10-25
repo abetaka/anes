@@ -57,6 +57,7 @@ func bits(v uint, pos uint, width uint) uint {
 type Nes struct {
 	cpu     *Cpu
 	ppu     *Ppu
+	apu     *Apu
 	Pad     [2]Gamepad
 	Kbd     *KbdReader
 	mem     *MainMemory
@@ -99,6 +100,7 @@ func NewNes(conf *Conf, d Display) *Nes {
 	nes := new(Nes)
 	nes.cpu = NewCpu(nes)
 	nes.ppu = NewPpu(nes)
+	nes.apu = NewApu(nes)
 	nes.mem = NewMainMemory(nes)
 	nes.Kbd = NewKbdReader()
 	nes.cpu.mem = nes.mem
@@ -229,13 +231,18 @@ const framePeriodMicroSeconds = time.Microsecond * 16666
 func (nes *Nes) Run() {
 	nes.Reset()
 	lastRefreshTime := time.Now()
+	apuFrame := 0
 	for {
 		cycle := nes.cpu.executeInst()
 		if nes.ppu.giveCpuClockDelta(cycle) {
+			if apuFrame%6 == 0 {
+				nes.apu.giveFrameTiming()
+			}
 			t := time.Since(lastRefreshTime)
 			time.Sleep(framePeriodMicroSeconds - t)
 			lastRefreshTime = time.Now()
 		}
+		apuFrame++
 		nes.dbg.hook()
 	}
 }
